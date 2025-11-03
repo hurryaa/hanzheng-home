@@ -1,0 +1,67 @@
+/* 可访问性样式 */
+@import './styles/accessibility.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 全局主题样式 */
+body.dark {
+  @apply bg-gray-900 text-gray-100;
+}
+
+body.light {
+  @apply bg-gray-50 text-gray-900;
+}
+
+/* 卡片组件主题样式 */
+.card {
+  @apply transition-colors duration-300;
+}
+
+body.light .card {
+  @apply bg-white border-gray-200;
+}
+
+body.dark .card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/* 按钮主题样式 */
+.btn {
+  @apply transition-colors duration-300;
+}
+
+body.dark .btn {
+  @apply bg-gray-700 hover:bg-gray-600 text-white;
+}
+
+/* 输入框主题样式 */
+.input {
+  @apply transition-colors duration-300;
+}
+
+body.dark .input {
+  @apply bg-gray-800 border-gray-700 text-white placeholder-gray-400;
+}
+
+/* 侧边栏动画优化 */
+.sidebar-transition {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 确保遮罩层动画流畅 */
+.overlay-transition {
+  transition: opacity 0.3s ease-in-out;
+}
