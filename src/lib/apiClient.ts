@@ -30,10 +30,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
+    const token = localStorage.getItem('authToken');
+
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {})
       },
       signal: controller.signal
@@ -67,6 +70,10 @@ export const apiClient = {
   importCollections: (collections: Record<string, unknown>) => request<{ ok: boolean }>(`/import`, {
     method: 'POST',
     body: JSON.stringify({ collections })
+  }),
+  login: (username: string, password: string) => request<{ token: string; user: { id: string; username: string; role: string; name: string; email: string } }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
   })
 };
 

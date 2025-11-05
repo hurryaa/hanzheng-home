@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { AuthContext } from '@/contexts/authContext';
+import { AuthContext, type AuthUser } from '@/contexts/authContext';
 import { validateAndInitData } from '@/lib/utils';
 import { useAccessibility } from '@/hooks/useAccessibility';
 
@@ -89,14 +89,27 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const { announce } = useAccessibility();
      
   // 检查本地存储中的认证状态和初始化数据
   useEffect(() => {
-    const savedAuth = localStorage.getItem('isAuthenticated');
-    if (savedAuth === 'true') {
-      setIsAuthenticated(true);
+    const savedToken = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('userInfo');
+    
+    if (savedToken && savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setToken(savedToken);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Failed to parse user info:', error);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userInfo');
+      }
     }
     
     // 验证并初始化存储数据
@@ -105,14 +118,20 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  const login = () => {
+  const login = ({ token, user }: { token: string; user: AuthUser }) => {
     setIsAuthenticated(true);
-    localStorage.setItem('isAuthenticated', 'true');
+    setToken(token);
+    setUser(user);
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('userInfo', JSON.stringify(user));
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    localStorage.removeItem('isAuthenticated');
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userInfo');
   };
 
   if (loading) {
@@ -128,7 +147,7 @@ export default function App() {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, login, logout }}
+      value={{ isAuthenticated, token, user, login, logout }}
     >
       {/* 跳转到主内容链接 - 可访问性增强 */}
       <a
