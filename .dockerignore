@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+npm-debug.log
+pnpm-debug.log
+
+# Lock files (不需要在Docker中)
+package-lock.json
+yarn.lock
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist
+build
+*.flag
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.DS_Store
+.cache
+.temp
+.tmp

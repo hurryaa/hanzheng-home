@@ -3,9 +3,9 @@ WORKDIR /app
 
 RUN apk add --no-cache curl
 
-# 安装依赖（包括 mysql2 用于迁移）
+# 安装依赖
 COPY package*.json ./
-RUN npm ci
+RUN npm install --production=false
 
 # 复制源代码
 COPY src ./src
