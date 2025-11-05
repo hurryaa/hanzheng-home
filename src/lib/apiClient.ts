@@ -1,11 +1,8 @@
+import { getApiUrl } from '@/lib/config';
+
 const DEFAULT_TIMEOUT = 15000;
 
-const parseBaseUrl = () => {
-  const url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-  return url.endsWith('/') ? url.slice(0, -1) : url;
-};
-
-const API_BASE_URL = parseBaseUrl();
+const API_BASE_URL = getApiUrl();
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 

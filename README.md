@@ -52,14 +52,26 @@ cd <project-directory>
 pnpm install
 ```
 
-3. **安装后端依赖**
+3. **配置前端环境变量**
+
+复制环境变量文件：
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 配置API地址：
+```env
+VITE_API_URL=http://localhost:4000/api
+```
+
+4. **安装后端依赖**
 ```bash
 cd server
 npm install
 cd ..
 ```
 
-4. **配置数据库**
+5. **配置数据库**
 
 复制环境变量文件：
 ```bash
@@ -75,14 +87,14 @@ DB_PASSWORD=your_password
 DB_NAME=sauna_membership
 ```
 
-5. **初始化数据库**
+6. **初始化数据库**
 ```bash
 cd server
 npm run migrate
 cd ..
 ```
 
-6. **启动开发服务器**
+7. **启动开发服务器**
 
 启动后端API服务（终端1）：
 ```bash
@@ -95,7 +107,7 @@ npm run dev
 pnpm run dev
 ```
 
-7. **访问应用**
+8. **访问应用**
 ```
 前端: http://localhost:3000
 后端API: http://localhost:4000
@@ -171,15 +183,31 @@ npm install -g vercel
 
 2. **配置环境变量**
 
-在 Vercel Dashboard 中设置：
-- `VITE_API_URL`: 后端API地址（例如：`https://api.yourdomain.com/api`）
+在 Vercel Dashboard 中设置环境变量：
+- 访问你的项目 Settings → Environment Variables
+- 添加 `VITE_API_URL` 变量，值为后端API地址（例如：`https://api.yourdomain.com/api`）
+- 可以为不同环境（Production, Preview, Development）设置不同的值
+
+**使用 Vercel Secrets（可选）**:
+
+如果需要使用 Vercel Secrets，可以通过CLI创建：
+```bash
+vercel secrets add api_url https://api.yourdomain.com/api
+```
+
+然后在 Vercel Dashboard 的环境变量中引用：
+- 变量名: `VITE_API_URL`
+- 值: `@api_url` (引用secret)
 
 3. **部署**
 ```bash
 vercel --prod
 ```
 
-⚠️ **注意**: Vercel部署仅包含前端静态资源。后端API需要单独部署到支持Node.js的服务器。
+⚠️ **注意**: 
+- Vercel部署仅包含前端静态资源。后端API需要单独部署到支持Node.js的服务器。
+- 如果使用 secret 引用（如 `@api_url`），必须先创建对应的 secret，否则部署会失败。
+- 推荐使用 Dashboard 直接设置环境变量，无需使用 secrets。
 
 ## 📂 项目结构
 
