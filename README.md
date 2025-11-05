@@ -33,11 +33,13 @@
 
 ## 🚀 快速开始
 
+> **新用户？** 查看 [快速开始指南 (QUICKSTART.md)](./QUICKSTART.md) - 5分钟快速部署！
+
 ### 环境要求
 
 - Node.js 18+ 
 - pnpm 8+
-- MySQL 5.7+ 或 8.0+
+- MySQL 5.7+ 或 8.0+ (需提前安装并启动)
 
 ### 本地开发
 
@@ -123,15 +125,26 @@ pnpm run dev
 
 ### Docker 部署
 
+**前置条件**：确保 MySQL 已在宿主机安装并启动（端口 3306）
+
 1. **准备 `.env` 文件**
 
-复制并编辑环境变量文件，确保数据库账号、密码、端口等信息正确：
+复制并编辑环境变量文件，配置宿主机 MySQL 的连接信息：
 ```bash
 cp .env.example .env
-# 编辑 .env 调整 DB_USER / DB_PASSWORD / VITE_API_URL 等
+# 编辑 .env，填入宿主机 MySQL 的用户名和密码
 ```
 
-> Docker Compose 会自动读取 `.env`，并将数据库配置注入到 MySQL 与后端容器中。
+示例配置：
+```env
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+DB_NAME=sauna_membership
+```
+
+> Docker 后端容器将使用 `host` 网络模式直接连接宿主机的 MySQL。
 
 2. **构建并启动服务**
 ```bash
@@ -144,8 +157,7 @@ docker compose up -d --build
 ```
 
 容器说明：
-- `mysql`：MySQL 8.0 数据库
-- `backend`：Express + Node.js API 服务
+- `backend`：Express + Node.js API 服务（通过 host 网络访问宿主机 MySQL）
 - `frontend`：Nginx 托管的前端静态资源
 
 3. **查看日志**
@@ -161,6 +173,7 @@ docker compose down
 访问地址：
 - 前端：`http://localhost:${FRONTEND_PORT:-8080}`（默认 `http://localhost:8080`）
 - 后端：`http://localhost:${SERVER_PORT:-4000}`（默认 `http://localhost:4000`）
+- 数据库：使用宿主机 `localhost:3306`
 
 ### 传统部署
 

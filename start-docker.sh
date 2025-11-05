@@ -23,7 +23,7 @@ echo "✅ 找到 .env 配置文件"
 echo ""
 
 # 启动 Docker Compose
-echo "🚀 启动 Docker 容器..."
+echo "🚀 启动 Docker 容器 (后台 + 前端)..."
 docker compose up -d --build
 
 if [ $? -eq 0 ]; then
@@ -33,8 +33,9 @@ if [ $? -eq 0 ]; then
     echo "=========================================="
     echo ""
     echo "访问地址："
-    echo "  前端: http://localhost:8080"
-    echo "  后端: http://localhost:4000"
+    echo "  前端: http://localhost:${FRONTEND_PORT:-8080}"
+    echo "  后端: http://localhost:${SERVER_PORT:-4000}"
+    echo "  数据库: mysql://$DB_USER:******@${DB_HOST}:${DB_PORT}/${DB_NAME}"
     echo ""
     echo "查看日志: docker compose logs -f"
     echo "停止服务: docker compose down"

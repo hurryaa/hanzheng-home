@@ -31,16 +31,18 @@ FRONTEND_PORT=8080             # 前端容器暴露的端口
 
 ## 🚀 快速部署（Docker）
 
+**前置条件**: 确保 MySQL 已安装并运行在宿主机的 3306 端口
+
 ### 1. 一键启动
 
 ```bash
 # 1. 复制环境变量文件
 cp .env.example .env
 
-# 2. 编辑 .env，修改必要的配置
-nano .env  # 或使用其他编辑器
+# 2. 编辑 .env，填入宿主机 MySQL 信息
+nano .env  # 重点配置：DB_USER, DB_PASSWORD, DB_NAME
 
-# 3. 启动所有服务
+# 3. 启动后端和前端容器
 ./start-docker.sh
 ```
 
@@ -53,8 +55,8 @@ docker compose up -d --build
 # 查看服务状态
 docker compose ps
 
-# 查看日志
-docker compose logs -f
+# 查看后端日志
+docker compose logs backend
 
 # 停止服务
 docker compose down

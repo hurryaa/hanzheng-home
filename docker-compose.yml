@@ -1,30 +1,6 @@
 version: '3.8'
 
 services:
-  # MySQL 数据库
-  mysql:
-    image: mysql:8.0
-    container_name: sauna-mysql
-    env_file:
-      - .env
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "${DB_PORT}:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${DB_USER}", "-p${DB_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - sauna_network
-
   # 后端 API 服务
   backend:
     build:
@@ -35,27 +11,17 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      JWT_SECRET: ${JWT_SECRET}
-      SERVER_PORT: ${SERVER_PORT:-4000}
     ports:
       - "${SERVER_PORT:-4000}:${SERVER_PORT:-4000}"
-    depends_on:
-      mysql:
-        condition: service_healthy
     restart: unless-stopped
+    # 使用 host 网络模式以访问宿主机的 MySQL
+    network_mode: host
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${SERVER_PORT:-4000}/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - sauna_network
 
   # 前端应用
   frontend:
@@ -67,7 +33,7 @@ services:
         - VITE_API_URL=${VITE_API_URL:-http://localhost:4000/api}
     container_name: sauna-frontend
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - backend
     restart: unless-stopped
@@ -77,13 +43,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-    networks:
-      - sauna_network
-
-volumes:
-  mysql_data:
-    driver: local
-
-networks:
-  sauna_network:
-    driver: bridge
