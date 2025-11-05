@@ -206,6 +206,8 @@ mysql -h 127.0.0.1 -u root -p
 
 #### 4. Docker 连接宿主机 MySQL
 
+**⚠️ 重要**: Docker 部署时，**不能使用 `127.0.0.1` 或 `localhost`**
+
 如果使用 Docker 部署，需要特殊配置：
 
 **Linux:**
@@ -218,7 +220,12 @@ DB_HOST=172.17.0.1
 DB_HOST=host.docker.internal
 ```
 
-**检查 MySQL 绑定地址:**
+> 💡 **快速修复**: 使用 `./docker-start.sh` 脚本会自动检测并配置正确的 DB_HOST
+
+#### 5. 检查 MySQL 绑定地址
+
+Docker 需要 MySQL 允许外部连接：
+
 ```bash
 # 编辑 MySQL 配置
 sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
@@ -228,6 +235,20 @@ bind-address = 0.0.0.0
 
 # 重启 MySQL
 sudo systemctl restart mysql
+
+# 验证监听
+sudo netstat -tuln | grep 3306
+# 应该看到: 0.0.0.0:3306
+```
+
+#### 6. 测试 Docker 网络连接
+
+```bash
+# Linux: 测试到宿主机的连接
+docker run --rm mysql:8.0 mysql -h 172.17.0.1 -u root -p
+
+# Mac/Windows: 测试到宿主机的连接  
+docker run --rm mysql:8.0 mysql -h host.docker.internal -u root -p
 ```
 
 ---

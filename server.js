@@ -33,13 +33,103 @@ const config = {
   corsOrigin: process.env.CORS_ORIGIN || '*'
 };
 
+const originalDbHost = config.db.host;
+const dbConnectTimeout = (() => {
+  const envValue = Number(process.env.DB_CONNECT_TIMEOUT);
+  if (Number.isNaN(envValue) || envValue <= 0) {
+    return 5000;
+  }
+  return envValue;
+})();
+
+let resolvedDbHost = null;
+let hostResolutionPromise = null;
+
+function parseFallbackHosts() {
+  const fallbackEnv = process.env.DB_HOST_FALLBACKS;
+  if (fallbackEnv && fallbackEnv.trim().length > 0) {
+    return fallbackEnv
+      .split(',')
+      .map(host => host.trim())
+      .filter(Boolean);
+  }
+  if (['127.0.0.1', 'localhost'].includes(originalDbHost)) {
+    return ['host.docker.internal', '172.17.0.1'];
+  }
+  return [];
+}
+
+async function resolveDbHost() {
+  if (resolvedDbHost) {
+    return resolvedDbHost;
+  }
+
+  if (!hostResolutionPromise) {
+    hostResolutionPromise = (async () => {
+      const fallbackHosts = parseFallbackHosts();
+      const candidates = [
+        config.db.host,
+        ...fallbackHosts.filter(host => host && host !== config.db.host)
+      ];
+
+      const attemptErrors = [];
+
+      for (const host of candidates) {
+        try {
+          const connection = await mysql.createConnection({
+            host,
+            port: config.db.port,
+            user: config.db.user,
+            password: config.db.password,
+            connectTimeout: dbConnectTimeout
+          });
+          await connection.query('SELECT 1');
+          await connection.end();
+
+          resolvedDbHost = host;
+          config.db.host = host;
+
+          if (host !== originalDbHost) {
+            console.warn(`⚠️  数据库主机不可达 (${originalDbHost})，自动切换到: ${host}`);
+          } else {
+            console.log(`✓ 数据库主机: ${host}`);
+          }
+
+          return host;
+        } catch (error) {
+          attemptErrors.push({
+            host,
+            code: error.code,
+            message: error.message
+          });
+        }
+      }
+
+      const resolutionError = new Error('无法连接到数据库，请检查 DB_HOST 配置');
+      resolutionError.code = 'DB_HOST_RESOLUTION_FAILED';
+      resolutionError.originalHost = originalDbHost;
+      resolutionError.attempts = attemptErrors;
+      resolutionError.candidates = candidates;
+      throw resolutionError;
+    })();
+  }
+
+  try {
+    return await hostResolutionPromise;
+  } catch (error) {
+    hostResolutionPromise = null;
+    throw error;
+  }
+}
+
 // 数据库连接池
 let pool = null;
 
 async function getPool() {
   if (!pool) {
+    const host = await resolveDbHost();
     pool = mysql.createPool({
-      host: config.db.host,
+      host,
       port: config.db.port,
       user: config.db.user,
       password: config.db.password,
@@ -57,6 +147,25 @@ async function getPool() {
 // 数据库初始化
 async function initDatabase() {
   console.log('开始初始化数据库...');
+  
+  // 解析数据库主机
+  try {
+    await resolveDbHost();
+  } catch (error) {
+    if (error.code === 'DB_HOST_RESOLUTION_FAILED') {
+      console.error('');
+      console.error('无法连接到任何数据库主机');
+      if (Array.isArray(error.attempts) && error.attempts.length > 0) {
+        console.error('尝试的主机列表:');
+        error.attempts.forEach(attempt => {
+          const code = attempt.code ? ` (${attempt.code})` : '';
+          console.error(`  - ${attempt.host}${code}: ${attempt.message}`);
+        });
+      }
+      console.error('');
+    }
+    throw error;
+  }
   
   // 创建数据库（如果不存在）
   const tempConnection = await mysql.createConnection({
@@ -371,6 +480,75 @@ async function start() {
     });
   } catch (error) {
     console.error('启动失败:', error);
+    
+    // 提供针对性的错误提示
+    if (error.code === 'ECONNREFUSED') {
+      console.error('');
+      console.error('========================================');
+      console.error('💡 数据库连接失败 - 请检查以下几点:');
+      console.error('========================================');
+      console.error('');
+      console.error('1. MySQL 是否已启动？');
+      console.error('   检查命令: systemctl status mysql');
+      console.error('');
+      console.error('2. 连接配置是否正确？');
+      console.error(`   当前配置: ${config.db.host}:${config.db.port}`);
+      console.error('');
+      console.error('3. Docker 部署注意事项:');
+      console.error('   ❌ 不能使用: DB_HOST=127.0.0.1');
+      console.error('   ✅ Linux 使用: DB_HOST=172.17.0.1');
+      console.error('   ✅ Mac/Win 使用: DB_HOST=host.docker.internal');
+      console.error('');
+      console.error('4. MySQL 是否允许远程连接？');
+      console.error('   编辑 /etc/mysql/mysql.conf.d/mysqld.cnf');
+      console.error('   设置 bind-address = 0.0.0.0');
+      console.error('   重启命令: sudo systemctl restart mysql');
+      console.error('');
+      console.error('详细说明请查看: TROUBLESHOOTING.md');
+      console.error('========================================');
+      console.error('');
+    } else if (error.code === 'DB_HOST_RESOLUTION_FAILED') {
+      console.error('');
+      console.error('========================================');
+      console.error('💡 无法连接到数据库主机');
+      console.error('========================================');
+      console.error('');
+      if (Array.isArray(error.attempts) && error.attempts.length > 0) {
+        console.error('尝试的主机:');
+        error.attempts.forEach(attempt => {
+          const code = attempt.code ? ` (${attempt.code})` : '';
+          console.error(`   - ${attempt.host}${code}: ${attempt.message}`);
+        });
+        console.error('');
+      }
+      console.error(`.env 中配置的 DB_HOST: ${error.originalHost || originalDbHost}`);
+      console.error('');
+      console.error('Docker 部署请使用:');
+      console.error('   - Linux:   DB_HOST=172.17.0.1');
+      console.error('   - Mac/Win: DB_HOST=host.docker.internal');
+      console.error('');
+      console.error('如需自定义回退主机，可设置环境变量:');
+      console.error('   DB_HOST_FALLBACKS=host1,host2');
+      console.error('');
+      console.error('详细说明请查看 DOCKER_DEPLOYMENT.md 和 TROUBLESHOOTING.md');
+      console.error('========================================');
+      console.error('');
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('');
+      console.error('========================================');
+      console.error('💡 MySQL 认证失败 - 请检查:');
+      console.error('========================================');
+      console.error('');
+      console.error('1. 用户名和密码是否正确？');
+      console.error(`   当前用户: ${config.db.user}`);
+      console.error('');
+      console.error('2. 用户是否有权限访问？');
+      console.error('   测试命令: mysql -h HOST -u USER -p');
+      console.error('');
+      console.error('========================================');
+      console.error('');
+    }
+    
     process.exit(1);
   }
 }

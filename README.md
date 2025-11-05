@@ -2,6 +2,13 @@
 
 一键部署的全栈会员管理系统，专为汗蒸养生馆等服务行业设计。前后端一体化，极简部署。
 
+## 📚 文档导航
+
+- 🚀 [快速开始](#-快速开始3-步) - 3步完成部署
+- 🐳 [Docker部署](./DOCKER_DEPLOYMENT.md) - 容器化部署详细教程
+- 🔧 [故障排除](./TROUBLESHOOTING.md) - 常见问题解决方案
+- 📖 [功能说明](#-核心功能) - 系统功能介绍
+
 ## ✨ 特点
 
 - 🚀 **一键启动** - 单个命令即可运行
@@ -53,11 +60,17 @@ pnpm start
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-nano .env  # 填入 MySQL 账号密码
+nano .env  # 填入 MySQL 账号密码（并根据操作系统设置 DB_HOST）
+#            - Linux:   DB_HOST=172.17.0.1
+#            - Mac/Win: DB_HOST=host.docker.internal
 
 # 2. 启动容器
 docker compose up -d --build
+# （或使用一键脚本）
+./docker-start.sh
 ```
+
+> 📘 **详细教程**：请参考 [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md)
 
 ### 访问系统
 
@@ -80,6 +93,10 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=sauna_membership
+
+# 可选: 自定义回退主机（逗号分隔）
+# DB_HOST_FALLBACKS=host.docker.internal,172.17.0.1
+# DB_CONNECT_TIMEOUT=5000
 
 # 服务端口
 PORT=4000
