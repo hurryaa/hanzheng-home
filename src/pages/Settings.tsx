@@ -3,6 +3,10 @@ import * as XLSX from 'xlsx';
 import { cn, storage, getCardTypes, updateCardType, getRechargeRecords, getConsumptionRecords } from '@/lib/utils';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import AccountManagement from '@/components/settings/AccountManagement';
+import MemberControl from '@/components/settings/MemberControl';
+import PermissionManagement from '@/components/settings/PermissionManagement';
+import OperationLogList, { OperationLog } from '@/components/settings/OperationLogs';
 
 // 服务类别模型
 interface ServiceCategory {
@@ -333,6 +337,24 @@ export default function Settings() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'add' | 'edit'>('add');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const appendOperationLog = (module: string, action: string, details: string) => {
+    try {
+      const logs = storage.get<OperationLog[]>('operationLogs') || [];
+      const newLog: OperationLog = {
+        id: `LOG${Date.now().toString(36)}`,
+        operator: '系统管理员',
+        module,
+        action,
+        details,
+        timestamp: new Date().toISOString()
+      };
+      logs.unshift(newLog);
+      storage.set('operationLogs', logs.slice(0, 5000));
+    } catch (error) {
+      console.error('记录操作日志失败:', error);
+    }
+  };
   
   // 数据备份处理函数
   const handleCreateBackup = () => {
@@ -867,15 +889,48 @@ export default function Settings() {
               <i className="fa-solid fa-bell mr-2"></i>通知设置
             </button>
             <button
-              onClick={() => setActiveTab('roles')}
+              onClick={() => setActiveTab('accounts')}
               className={cn(
                 "py-4 px-1 border-b-2 font-medium text-sm",
-                activeTab === 'roles'
+                activeTab === 'accounts'
                   ? "border-blue-500 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               )}
             >
-              <i className="fa-solid fa-users-gear mr-2"></i>角色权限
+              <i className="fa-solid fa-id-badge mr-2"></i>账号管理
+            </button>
+            <button
+              onClick={() => setActiveTab('memberControl')}
+              className={cn(
+                "py-4 px-1 border-b-2 font-medium text-sm",
+                activeTab === 'memberControl'
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              )}
+            >
+              <i className="fa-solid fa-users mr-2"></i>成员控制
+            </button>
+            <button
+              onClick={() => setActiveTab('permissions')}
+              className={cn(
+                "py-4 px-1 border-b-2 font-medium text-sm",
+                activeTab === 'permissions'
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              )}
+            >
+              <i className="fa-solid fa-users-gear mr-2"></i>权限管理
+            </button>
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={cn(
+                "py-4 px-1 border-b-2 font-medium text-sm",
+                activeTab === 'logs'
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              )}
+            >
+              <i className="fa-solid fa-file-lines mr-2"></i>操作记录
             </button>
             <button
               onClick={() => setActiveTab('system')}
@@ -1047,6 +1102,30 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+          
+           {activeTab === 'accounts' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
+              <AccountManagement onLog={appendOperationLog} />
+            </div>
+          )}
+          
+           {activeTab === 'memberControl' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
+              <MemberControl onLog={appendOperationLog} />
+            </div>
+          )}
+          
+           {activeTab === 'permissions' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
+              <PermissionManagement onLog={appendOperationLog} />
+            </div>
+          )}
+          
+           {activeTab === 'logs' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
+              <OperationLogList />
             </div>
           )}
           

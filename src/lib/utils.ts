@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 
 // 初始化数据库连接
 const db = DBService.getInstance();
-db.connect();
+// 注意：connect() 现在是异步的，会在 main.tsx 中处理
 
 // 数据持久化工具函数
 // 数据访问工具函数 - 通过数据库服务访问
@@ -44,9 +44,8 @@ export const storage = {
   
   clear: (): void => {
     try {
-      // 获取所有集合并清空
-      const collections = ['members', 'recharges', 'consumptions', 'cardTypes'];
-      collections.forEach(collection => {
+      const collections = db.getKnownCollections();
+      collections.forEach((collection) => {
         db.saveCollection(collection, []);
       });
       toast.success('所有数据已清空');
