@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
@@ -304,11 +305,38 @@ app.post('/api/auth/login', async (req, res) => {
 
 // 静态文件服务（生产环境）
 if (process.env.NODE_ENV === 'production') {
-  const staticPath = path.join(__dirname, 'dist', 'static');
+  const distDir = path.join(__dirname, 'dist');
+  const candidates = [
+    path.join(distDir, 'static'),
+    distDir
+  ];
+
+  const staticPath = candidates.find((dir) => existsSync(path.join(dir, 'index.html')));
+
+  if (!staticPath) {
+    console.error('');
+    console.error('❌ 错误: 未找到构建文件');
+    console.error('   已尝试路径:');
+    candidates.forEach((dir) => console.error(`     - ${path.join(dir, 'index.html')}`));
+    console.error('');
+    console.error('💡 请先运行构建命令:');
+    console.error('   pnpm run build');
+    console.error('');
+    process.exit(1);
+  }
+
+  const indexPath = path.join(staticPath, 'index.html');
+  console.log(`✓ 静态资源目录: ${staticPath}`);
+
   app.use(express.static(staticPath));
-  
+
   app.get('*', (req, res) => {
-    res.sendFile(path.join(staticPath, 'index.html'));
+    res.sendFile(indexPath, (error) => {
+      if (error) {
+        console.error('静态资源响应错误:', error);
+        res.status(500).send('静态资源加载失败，请检查构建结果。');
+      }
+    });
   });
 }
 

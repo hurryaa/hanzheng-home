@@ -31,9 +31,44 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # 检查是否已构建
-if [ ! -d "dist" ]; then
+BUILD_TARGETS=("dist/static/index.html" "dist/index.html")
+build_output=""
+
+for target in "${BUILD_TARGETS[@]}"; do
+    if [ -f "$target" ]; then
+        build_output="$target"
+        break
+    fi
+done
+
+if [ -z "$build_output" ]; then
     echo "🔨 正在构建前端..."
     pnpm run build
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "❌ 构建失败，请检查错误信息"
+        exit 1
+    fi
+    echo ""
+
+    for target in "${BUILD_TARGETS[@]}"; do
+        if [ -f "$target" ]; then
+            build_output="$target"
+            break
+        fi
+    done
+
+    if [ -z "$build_output" ]; then
+        echo "❌ 构建失败: 未找到 dist/static/index.html 或 dist/index.html"
+        echo "💡 请手动运行构建命令并检查错误:"
+        echo "   pnpm run build"
+        exit 1
+    fi
+
+    echo "✅ 构建成功: $build_output"
+    echo ""
+else
+    echo "✅ 检测到前端构建文件: $build_output"
     echo ""
 fi
 

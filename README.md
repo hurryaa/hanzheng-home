@@ -171,6 +171,18 @@ mysql -u root -p sauna_membership < backup.sql
 2. 检查 `.env` 中的数据库配置
 3. 测试连接：`mysql -u root -p`
 
+### Q: 启动时提示 "ENOENT: no such file or directory, stat dist/static/index.html"？
+
+**A**: 这是因为前端未构建或构建失败。解决方法：
+1. 手动运行构建：`pnpm run build`
+2. 确认 `dist/static/index.html` 文件存在
+3. 使用 `./start.sh` 脚本启动，它会自动检测并构建
+
+**注意**：如果部署到生产服务器，必须确保：
+- 运行过 `pnpm run build` 
+- `dist/` 目录已复制到服务器
+- 或使用 `./start.sh` 自动构建
+
 ### Q: 端口 4000 被占用？
 
 **A**: 修改 `.env` 中的 `PORT=4000` 为其他端口，如 `PORT=5000`
