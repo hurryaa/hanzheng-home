@@ -1,60 +1,47 @@
-# 多阶段构建 - 构建阶段
+# 多阶段构建
 FROM node:18-alpine AS builder
 
-# 设置工作目录
 WORKDIR /app
 
-# 复制package文件
-COPY package*.json ./
-COPY pnpm-lock.yaml ./
-
-# 安装pnpm
+# 安装 pnpm
 RUN npm install -g pnpm
 
-# 安装依赖
+# 复制依赖文件
+COPY package.json pnpm-lock.yaml ./
+
+# 安装所有依赖（包括开发依赖）
 RUN pnpm install --frozen-lockfile
 
 # 复制源代码
 COPY . .
 
-# 接收构建参数
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
-
-# 构建应用
+# 构建前端
 RUN pnpm run build
 
-# 生产阶段 - 使用nginx提供静态文件服务
-FROM nginx:alpine AS production
+# 生产镜像
+FROM node:18-alpine
 
-# 安装必要的工具
+WORKDIR /app
+
 RUN apk add --no-cache curl
 
-# 复制nginx配置
-COPY nginx.conf /etc/nginx/nginx.conf
+# 复制依赖文件
+COPY package.json pnpm-lock.yaml ./
 
-# 复制构建产物
-COPY --from=builder /app/dist/static /usr/share/nginx/html
+# 安装 pnpm 和生产依赖
+RUN npm install -g pnpm && \
+    pnpm install --prod --frozen-lockfile
 
-# 创建非root用户
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
+# 复制构建产物和服务器文件
+COPY --from=builder /app/dist ./dist
+COPY server.js ./
 
-# 设置正确的权限
-RUN chown -R nextjs:nodejs /usr/share/nginx/html && \
-    chown -R nextjs:nodejs /var/cache/nginx && \
-    chown -R nextjs:nodejs /var/log/nginx && \
-    chown -R nextjs:nodejs /etc/nginx/conf.d
+ENV NODE_ENV=production
+ENV PORT=4000
 
-# 切换到非root用户
-USER nextjs
+EXPOSE 4000
 
-# 暴露端口
-EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:4000/api/health || exit 1
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
-
-# 启动nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]

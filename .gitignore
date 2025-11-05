@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-server/node_modules/
 
 # Lock files (keep only pnpm-lock.yaml)
 package-lock.json

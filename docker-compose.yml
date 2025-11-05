@@ -1,45 +1,21 @@
 version: '3.8'
 
 services:
-  # 后端 API 服务
-  backend:
+  app:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
-    container_name: sauna-backend
+    container_name: sauna-app
     env_file:
       - .env
-    environment:
-      NODE_ENV: production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "${SERVER_PORT:-4000}:${SERVER_PORT:-4000}"
+      - "${PORT:-4000}:4000"
     restart: unless-stopped
-    # 使用 host 网络模式以访问宿主机的 MySQL
-    network_mode: host
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${SERVER_PORT:-4000}/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # 前端应用
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:4000/api}
-    container_name: sauna-frontend
-    ports:
-      - "${FRONTEND_PORT:-8080}:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
