@@ -17,6 +17,10 @@ RUN pnpm install --frozen-lockfile
 # 复制源代码
 COPY . .
 
+# 接收构建参数
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # 构建应用
 RUN pnpm run build
 

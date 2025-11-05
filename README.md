@@ -47,42 +47,53 @@ git clone <repository-url>
 cd <project-directory>
 ```
 
-2. **安装前端依赖**
+2. **配置环境变量**
+
+复制环境变量文件：
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 配置数据库连接和其他参数：
+```env
+# 数据库配置
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=sauna_membership
+
+# JWT密钥（请修改为随机字符串）
+JWT_SECRET=your_random_secret_key_at_least_32_characters
+
+# API地址
+VITE_API_URL=http://localhost:4000/api
+```
+
+3. **安装依赖**
+
+前端：
 ```bash
 pnpm install
 ```
 
-3. **安装后端依赖**
+后端：
 ```bash
 cd server
 npm install
 cd ..
 ```
 
-4. **配置数据库**
+4. **初始化数据库**
 
-复制环境变量文件：
-```bash
-cp server/.env.example server/.env
-```
-
-编辑 `server/.env` 配置数据库连接：
-```env
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=sauna_membership
-```
-
-5. **初始化数据库**
+确保MySQL服务已启动，然后运行：
 ```bash
 cd server
 npm run migrate
 cd ..
 ```
 
-6. **启动开发服务器**
+5. **启动开发服务器**
 
 启动后端API服务（终端1）：
 ```bash
@@ -95,7 +106,7 @@ npm run dev
 pnpm run dev
 ```
 
-7. **访问应用**
+6. **访问应用**
 ```
 前端: http://localhost:3000
 后端API: http://localhost:4000
@@ -112,20 +123,44 @@ pnpm run dev
 
 ### Docker 部署
 
-1. **构建并启动服务**
+1. **准备 `.env` 文件**
+
+复制并编辑环境变量文件，确保数据库账号、密码、端口等信息正确：
 ```bash
-docker-compose up -d
+cp .env.example .env
+# 编辑 .env 调整 DB_USER / DB_PASSWORD / VITE_API_URL 等
 ```
 
-2. **查看日志**
+> Docker Compose 会自动读取 `.env`，并将数据库配置注入到 MySQL 与后端容器中。
+
+2. **构建并启动服务**
 ```bash
-docker-compose logs -f
+docker compose up -d --build
 ```
 
-3. **停止服务**
+或使用提供的脚本：
 ```bash
-docker-compose down
+./start-docker.sh
 ```
+
+容器说明：
+- `mysql`：MySQL 8.0 数据库
+- `backend`：Express + Node.js API 服务
+- `frontend`：Nginx 托管的前端静态资源
+
+3. **查看日志**
+```bash
+docker compose logs -f
+```
+
+4. **停止服务**
+```bash
+docker compose down
+```
+
+访问地址：
+- 前端：`http://localhost:${FRONTEND_PORT:-8080}`（默认 `http://localhost:8080`）
+- 后端：`http://localhost:${SERVER_PORT:-4000}`（默认 `http://localhost:4000`）
 
 ### 传统部署
 
@@ -185,33 +220,35 @@ vercel --prod
 
 ```
 .
-├── public/                 # 静态资源
-│   └── templates/         # Excel导入模板
-├── server/                # 后端服务
+├── .env.example          # 根环境变量示例
+├── public/               # 静态资源
+│   └── templates/       # Excel导入模板
+├── server/              # 后端服务
+│   ├── Dockerfile       # 后端镜像构建文件
 │   ├── src/
-│   │   ├── config.js     # 配置文件
-│   │   ├── db/           # 数据库连接
-│   │   ├── models/       # 数据模型
-│   │   ├── routes/       # API路由
-│   │   └── index.js      # 入口文件
+│   │   ├── config.js   # 配置文件
+│   │   ├── db/         # 数据库连接
+│   │   ├── models/     # 数据模型
+│   │   ├── routes/     # API路由
+│   │   └── index.js    # 入口文件
 │   ├── package.json
-│   └── .env.example      # 环境变量示例
-├── src/                   # 前端源码
-│   ├── components/       # 通用组件
-│   │   └── settings/    # 设置页面组件
-│   ├── contexts/        # React Context
-│   ├── hooks/           # 自定义Hooks
-│   ├── lib/             # 工具库
+│   └── .env.example    # 后端环境变量示例（可选）
+├── src/                 # 前端源码
+│   ├── components/     # 通用组件
+│   │   └── settings/  # 设置页面组件
+│   ├── contexts/      # React Context
+│   ├── hooks/         # 自定义Hooks
+│   ├── lib/           # 工具库
 │   │   ├── apiClient.ts # API客户端
 │   │   ├── db.ts        # 数据库服务
 │   │   └── utils.ts     # 工具函数
-│   ├── pages/           # 页面组件
-│   ├── stores/          # Zustand状态管理
-│   └── main.tsx         # 应用入口
-├── docker-compose.yml    # Docker编排
-├── Dockerfile           # Docker镜像
-├── vercel.json          # Vercel配置
-└── README.md            # 项目文档
+│   ├── pages/         # 页面组件
+│   ├── stores/        # Zustand状态管理
+│   └── main.tsx       # 应用入口
+├── docker-compose.yml  # Docker 编排配置
+├── Dockerfile         # 前端镜像构建文件
+├── vercel.json        # Vercel 配置
+└── README.md          # 项目文档
 ```
 
 ## 🔧 技术栈
@@ -255,7 +292,7 @@ vercel --prod
 ## 🔐 安全建议
 
 1. **修改默认密码**: 首次登录后立即修改admin账号密码
-2. **JWT密钥**: 在 `server/.env` 中设置强壮的 `JWT_SECRET`
+2. **JWT密钥**: 在 `.env` 中设置强壮的 `JWT_SECRET`
 3. **数据库密码**: 使用强密码保护数据库
 4. **HTTPS**: 生产环境务必使用HTTPS
 5. **防火墙**: 限制数据库端口只能本地访问
@@ -290,10 +327,16 @@ db.saveCollection('members', updatedMembers);
 ## 📝 常见问题
 
 ### Q: 数据库连接失败？
-A: 检查MySQL服务是否启动，确认 `server/.env` 配置正确。
+A: 检查MySQL服务是否启动，确认 `.env` 配置正确（特别是 DB_HOST、DB_USER、DB_PASSWORD）。
 
 ### Q: 前端无法连接后端？
-A: 确认后端服务已启动在4000端口，检查CORS配置。
+A: 确认后端服务已启动在4000端口，检查 `.env` 中的 `VITE_API_URL` 配置正确，以及 CORS 配置。
+
+### Q: Docker 部署后无法访问？
+A: 
+1. 检查 `.env` 配置中的 `VITE_API_URL` 是否正确
+2. 确保 MySQL 容器已启动：`docker compose ps`
+3. 查看容器日志：`docker compose logs backend`、`docker compose logs mysql`
 
 ### Q: Excel导入失败？
 A: 确保Excel文件格式与模板一致，检查数据类型正确性。

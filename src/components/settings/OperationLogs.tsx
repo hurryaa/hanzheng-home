@@ -10,7 +10,7 @@ export interface OperationLog {
   timestamp: string;
 }
 
-const OperationLogs: React.FC = () => {
+export const OperationLogs: React.FC = () => {
   const [logs, setLogs] = useState<OperationLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<OperationLog[]>([]);
   const [filterModule, setFilterModule] = useState<string>('all');
