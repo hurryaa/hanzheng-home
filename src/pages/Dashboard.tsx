@@ -49,13 +49,14 @@ const WarningBadge = ({ daysLeft }: { daysLeft: number }) => {
 
 // 统计卡片组件
 const StatCard = ({
-  title, value, change, icon, color
+  title, value, change, icon, color, compareText = '较上月'
 }: {
   title: string,
   value: string | number,
   change: string,
   icon: string,
-  color: string
+  color: string,
+  compareText?: string
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -77,7 +78,7 @@ const StatCard = ({
             ) : (
               <i className="fa-solid fa-arrow-down mr-1 transform transition-transform duration-500"></i>
             )}
-            {change} 较上月
+            {change} {compareText}
           </div>
         </div>
         <div className={`p-3 rounded-lg text-white ${color} shadow-md transform transition-transform duration-500 ${isHovered ? 'scale-110' : ''}`}>
@@ -101,6 +102,127 @@ export default function Dashboard() {
     cardTypesCount: 0,
     timeRange: 'today'
   });
+
+  // 根据时间范围生成比较文本
+  const getCompareText = useCallback((range: 'today' | 'week' | 'month' | 'year'): string => {
+    switch (range) {
+      case 'today':
+        return '较昨日';
+      case 'week':
+        return '较上周';
+      case 'month':
+        return '较上月';
+      case 'year':
+        return '较去年';
+      default:
+        return '较上月';
+    }
+  }, []);
+
+  // 计算对比数据
+  const calculateComparison = useCallback((current: number, previous: number): string => {
+    if (previous === 0) {
+      return current > 0 ? '+100%' : '0%';
+    }
+    const change = ((current - previous) / Math.abs(previous) * 100).toFixed(1);
+    return (current - previous) >= 0 ? `+${change}%` : `${change}%`;
+  }, []);
+
+  // 获取对比期数据
+  const getComparisonData = useCallback((range: 'today' | 'week' | 'month' | 'year') => {
+    const members = getMembers();
+    const recharges = getRechargeRecords();
+    const consumptions = getConsumptionRecords();
+    const today = new Date();
+
+    let currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date;
+
+    switch (range) {
+      case 'today': {
+        currentStart = new Date();
+        currentStart.setHours(0, 0, 0, 0);
+        currentEnd = new Date();
+        currentEnd.setHours(23, 59, 59, 999);
+        previousStart = new Date(currentStart);
+        previousStart.setDate(previousStart.getDate() - 1);
+        previousEnd = new Date(currentEnd);
+        previousEnd.setDate(previousEnd.getDate() - 1);
+        break;
+      }
+      case 'week': {
+        const current = new Date();
+        const dayOfWeek = current.getDay() || 7;
+        currentStart = new Date(current);
+        currentStart.setDate(current.getDate() - dayOfWeek + 1);
+        currentStart.setHours(0, 0, 0, 0);
+        currentEnd = new Date(currentStart);
+        currentEnd.setDate(currentEnd.getDate() + 6);
+        currentEnd.setHours(23, 59, 59, 999);
+        previousStart = new Date(currentStart);
+        previousStart.setDate(previousStart.getDate() - 7);
+        previousEnd = new Date(currentEnd);
+        previousEnd.setDate(previousEnd.getDate() - 7);
+        break;
+      }
+      case 'month': {
+        currentStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        currentEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        previousStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        previousEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+        break;
+      }
+      case 'year': {
+        currentStart = new Date(today.getFullYear(), 0, 1);
+        currentEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+        previousStart = new Date(today.getFullYear() - 1, 0, 1);
+        previousEnd = new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+        break;
+      }
+      default:
+        currentStart = new Date();
+        currentEnd = new Date();
+        previousStart = new Date();
+        previousEnd = new Date();
+    }
+
+    const filterByDateRange = <T,>(items: T[], start: Date, end: Date, dateField: keyof T = 'time' as keyof T) => {
+      return items.filter(item => {
+        const value = item[dateField];
+        if (!value) return false;
+        const itemDate = new Date(value as unknown as string);
+        return itemDate >= start && itemDate <= end;
+      });
+    };
+
+    const currentRecharges = filterByDateRange(recharges, currentStart, currentEnd);
+    const previousRecharges = filterByDateRange(recharges, previousStart, previousEnd);
+    const currentConsumptions = filterByDateRange(consumptions, currentStart, currentEnd);
+    const previousConsumptions = filterByDateRange(consumptions, previousStart, previousEnd);
+    const currentMembers = filterByDateRange(members, currentStart, currentEnd, 'joinDate');
+    const previousMembers = filterByDateRange(members, previousStart, previousEnd, 'joinDate');
+
+    return {
+      rechargeAmount: {
+        current: currentRecharges.reduce((sum, r) => sum + (r.amount || 0), 0),
+        previous: previousRecharges.reduce((sum, r) => sum + (r.amount || 0), 0)
+      },
+      consumptionAmount: {
+        current: currentConsumptions.reduce((sum, c) => sum + (c.amount || 0), 0),
+        previous: previousConsumptions.reduce((sum, c) => sum + (c.amount || 0), 0)
+      },
+      newMembers: {
+        current: currentMembers.length,
+        previous: previousMembers.length
+      },
+      totalMembers: {
+        current: members.length,
+        previous: Math.max(0, members.length - currentMembers.length)
+      }
+    };
+  }, []);
+
+  const comparisonData = useMemo(() => getComparisonData(timeRange), [getComparisonData, timeRange]);
+  const compareText = useMemo(() => getCompareText(timeRange), [getCompareText, timeRange]);
 
   // 从数据库获取数据并处理
   const getDashboardData = useCallback((timeRange: 'today' | 'week' | 'month' | 'year') => {
@@ -671,48 +793,54 @@ export default function Dashboard() {
         <>
           {/* 统计卡片 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6">
-            <StatCard
-              title="总会员数"
-              value={dashboardData.totalMembers}
-              change="+12%"
-              icon="fa-users"
-              color="bg-blue-100 text-blue-600"
-            />
-            <StatCard
-              title="本月新增会员"
-              value={dashboardData.revenueData[dashboardData.revenueData.length - 1]?.members || 0}
-              change="+2"
-              icon="fa-user-plus"
-              color="bg-green-100 text-green-600"
-            />
-            <StatCard
-              title="本月消费总额"
-              value={`¥${dashboardData.monthlyConsumptionAmount.toLocaleString()}`}
-              change="+8%"
-              icon="fa-credit-card"
-              color="bg-purple-100 text-purple-600"
-            />
-            <StatCard
-              title="本月充值总额"
-              value={`¥${dashboardData.monthlyRechargeAmount.toLocaleString()}`}
-              change="+23%"
-              icon="fa-wallet"
-              color="bg-green-100 text-green-600"
-            />
-            <StatCard
-              title="次卡类型数量"
-              value={dashboardData.cardTypesCount}
-              change="+1"
-              icon="fa-ticket-alt"
-              color="bg-red-100 text-red-600"
-            />
-            <StatCard
-              title="活跃会员数"
-              value={Math.floor(dashboardData.totalMembers * 0.65)}
-              change="+5%"
-              icon="fa-user-check"
-              color="bg-teal-100 text-teal-600"
-            />
+                <StatCard
+                  title="总会员数"
+                  value={dashboardData.totalMembers}
+                  change={calculateComparison(comparisonData.totalMembers.current, comparisonData.totalMembers.previous)}
+                  icon="fa-users"
+                  color="bg-blue-100 text-blue-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title={timeRange === 'today' ? '今日新增会员' : timeRange === 'week' ? '本周新增会员' : timeRange === 'month' ? '本月新增会员' : '本年新增会员'}
+                  value={comparisonData.newMembers.current}
+                  change={calculateComparison(comparisonData.newMembers.current, comparisonData.newMembers.previous)}
+                  icon="fa-user-plus"
+                  color="bg-green-100 text-green-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title={timeRange === 'today' ? '今日消费总额' : timeRange === 'week' ? '本周消费总额' : timeRange === 'month' ? '本月消费总额' : '全年消费总额'}
+                  value={`¥${comparisonData.consumptionAmount.current.toLocaleString()}`}
+                  change={calculateComparison(comparisonData.consumptionAmount.current, comparisonData.consumptionAmount.previous)}
+                  icon="fa-credit-card"
+                  color="bg-purple-100 text-purple-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title={timeRange === 'today' ? '今日充值总额' : timeRange === 'week' ? '本周充值总额' : timeRange === 'month' ? '本月充值总额' : '全年充值总额'}
+                  value={`¥${comparisonData.rechargeAmount.current.toLocaleString()}`}
+                  change={calculateComparison(comparisonData.rechargeAmount.current, comparisonData.rechargeAmount.previous)}
+                  icon="fa-wallet"
+                  color="bg-green-100 text-green-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title="次卡类型数量"
+                  value={dashboardData.cardTypesCount}
+                  change="+0%"
+                  icon="fa-ticket-alt"
+                  color="bg-red-100 text-red-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title="活跃会员数"
+                  value={Math.floor(dashboardData.totalMembers * 0.65)}
+                  change={calculateComparison(Math.floor(dashboardData.totalMembers * 0.65), Math.floor(comparisonData.totalMembers.previous * 0.65))}
+                  icon="fa-user-check"
+                  color="bg-teal-100 text-teal-600"
+                  compareText={compareText}
+                />
           </div>
 
           {/* 图表区域 */}
