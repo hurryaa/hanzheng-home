@@ -1,8 +1,19 @@
 const DEFAULT_TIMEOUT = 15000;
 
 const parseBaseUrl = () => {
-  const url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-  return url.endsWith('/') ? url.slice(0, -1) : url;
+  // 优先使用环境变量
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  }
+  
+  // 生产环境使用相对路径（前后端一体化部署）
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+  
+  // 开发环境使用绝对路径
+  return 'http://localhost:4000/api';
 };
 
 const API_BASE_URL = parseBaseUrl();
@@ -19,10 +30,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
+    const token = localStorage.getItem('authToken');
+
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {})
       },
       signal: controller.signal
@@ -56,6 +70,10 @@ export const apiClient = {
   importCollections: (collections: Record<string, unknown>) => request<{ ok: boolean }>(`/import`, {
     method: 'POST',
     body: JSON.stringify({ collections })
+  }),
+  login: (username: string, password: string) => request<{ token: string; user: { id: string; username: string; role: string; name: string; email: string } }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
   })
 };
 

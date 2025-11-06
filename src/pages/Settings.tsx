@@ -418,29 +418,59 @@ export default function Settings() {
   };
   
   // 数据恢复处理函数
-  const handleRestoreData = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRestoreData = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       toast.info('正在恢复数据...');
       const file = e.target.files[0];
       
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(event) {
         try {
-          const data = new Uint8Array(e.target.result as ArrayBuffer);
+          const data = new Uint8Array(event.target!.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           
-          // 假设我们只处理第一个工作表
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          // 解析所有工作表
+          const collections: Record<string, any[]> = {};
+          const sheetNameMap: Record<string, string> = {
+            '会员数据': 'members',
+            '充值记录': 'recharges',
+            '消费记录': 'consumptions',
+            '次卡类型': 'cardTypes'
+          };
           
-          // 这里应该根据实际数据结构进行处理和导入
-          console.log('恢复的数据:', jsonData);
+          workbook.SheetNames.forEach(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            
+            // 映射工作表名称到集合名称
+            const collectionName = sheetNameMap[sheetName] || sheetName;
+            if (jsonData.length > 0) {
+              collections[collectionName] = jsonData;
+            }
+          });
           
-          // 模拟数据处理延迟
+          console.log('恢复的数据:', collections);
+          
+          // 调用API导入数据
+          const apiClient = (await import('@/lib/apiClient')).default;
+          await apiClient.importCollections(collections);
+          
+          // 更新本地存储
+          Object.entries(collections).forEach(([name, data]) => {
+            storage.set(name, data);
+          });
+          
+          // 记录操作日志
+          appendOperationLog('系统设置', '恢复数据', `成功从备份文件恢复了 ${Object.keys(collections).length} 个数据集合`);
+          
+          toast.success('数据恢复成功！请刷新页面以查看最新数据。');
+          
+          // 延迟后刷新页面
           setTimeout(() => {
-            toast.success('数据恢复成功！');
-            e.target.value = ''; // 重置文件输入
-          }, 1500);
+            window.location.reload();
+          }, 2000);
+          
+          e.target.value = ''; // 重置文件输入
         } catch (error) {
           console.error('数据恢复失败:', error);
           toast.error('数据恢复失败，请检查文件格式');

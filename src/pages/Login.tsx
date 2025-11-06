@@ -44,26 +44,24 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 调用后端登录API
+      const apiClient = (await import('@/lib/apiClient')).default;
+      const response = await apiClient.login(username, password);
+      
+      // 更新认证状态
+      login({ token: response.token, user: response.user });
+      toast.success('登录成功！');
 
-      // 生产环境登录验证
-      // 注意：在实际生产环境中，这里应该连接到后端API进行身份验证
-      if (username && password) {
-        // 这里仅做表单验证，实际项目中需要替换为真实的身份验证逻辑
-        login();
-        toast.success('登录成功！');
-
-        // 如果选择记住我，保存到localStorage
-        if (rememberMe) {
-          localStorage.setItem('rememberedUsername', username);
-        } else {
-          localStorage.removeItem('rememberedUsername');
-        }
+      // 如果选择记住我，保存到localStorage
+      if (rememberMe) {
+        localStorage.setItem('rememberedUsername', username);
+      } else {
+        localStorage.removeItem('rememberedUsername');
       }
-    } catch (error) {
-      setError('登录失败，请检查用户名和密码');
-      toast.error('登录失败');
+    } catch (error: any) {
+      const errorMessage = error?.message || '登录失败，请检查用户名和密码';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,13 @@
 
 一键部署的全栈会员管理系统，专为汗蒸养生馆等服务行业设计。前后端一体化，极简部署。
 
+## 📚 文档导航
+
+- 🚀 [快速开始](#-快速开始3-步) - 3步完成部署
+- 🐳 [Docker部署](./DOCKER_DEPLOYMENT.md) - 容器化部署详细教程
+- 🔧 [故障排除](./TROUBLESHOOTING.md) - 常见问题解决方案
+- 📖 [功能说明](#-核心功能) - 系统功能介绍
+
 ## ✨ 特点
 
 - 🚀 **一键启动** - 单个命令即可运行
@@ -26,9 +33,11 @@
 
 ### 前置条件
 
-- Node.js 18+
+- **Node.js 18.0 或更高版本** （必须！低版本无法运行）
 - MySQL 8.0（需提前安装）
 - pnpm 8+
+
+> ⚠️ **重要**: 如果 Node.js 版本低于 18，会出现语法错误（`SyntaxError: Unexpected token '||='`）。请使用 `node -v` 检查版本。
 
 ### 方式一：直接运行
 
@@ -51,11 +60,17 @@ pnpm start
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-nano .env  # 填入 MySQL 账号密码
+nano .env  # 填入 MySQL 账号密码（并根据操作系统设置 DB_HOST）
+#            - Linux:   DB_HOST=172.17.0.1
+#            - Mac/Win: DB_HOST=host.docker.internal
 
 # 2. 启动容器
 docker compose up -d --build
+# （或使用一键脚本）
+./docker-start.sh
 ```
+
+> 📘 **详细教程**：请参考 [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md)
 
 ### 访问系统
 
@@ -78,6 +93,10 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=sauna_membership
+
+# 可选: 自定义回退主机（逗号分隔）
+# DB_HOST_FALLBACKS=host.docker.internal,172.17.0.1
+# DB_CONNECT_TIMEOUT=5000
 
 # 服务端口
 PORT=4000
@@ -164,12 +183,33 @@ mysql -u root -p sauna_membership < backup.sql
 
 ## 🔧 常见问题
 
+> 💡 **完整故障排除指南**: 请阅读 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) 获取详细的排查步骤。
+
 ### Q: 启动失败，提示数据库连接错误？
 
 **A**: 
 1. 确认 MySQL 已启动：`systemctl status mysql`
 2. 检查 `.env` 中的数据库配置
 3. 测试连接：`mysql -u root -p`
+
+### Q: 启动时提示 "SyntaxError: Unexpected token '||='"？
+
+**A**: 这是因为 Node.js 版本过低（< 18）。解决方法：
+1. 运行 `node -v` 检查版本
+2. 升级 Node.js 至 18 或更高版本（推荐使用 [nvm](https://github.com/nvm-sh/nvm)）
+3. 升级后重新运行 `./start.sh`
+
+### Q: 启动时提示 "ENOENT: no such file or directory, stat dist/static/index.html"？
+
+**A**: 这是因为前端未构建或构建失败。解决方法：
+1. 手动运行构建：`pnpm run build`
+2. 确认 `dist/static/index.html` 文件存在
+3. 使用 `./start.sh` 脚本启动，它会自动检测并构建
+
+**注意**：如果部署到生产服务器，必须确保：
+- 运行过 `pnpm run build`
+- `dist/` 目录已复制到服务器
+- 或使用 `./start.sh` 自动构建
 
 ### Q: 端口 4000 被占用？
 

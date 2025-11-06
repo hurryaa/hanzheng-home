@@ -1,5 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import * as XLSX from 'xlsx';
+import React, { useEffect, useState, useCallback, useMemo, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -8,6 +7,16 @@ import {
   Cell
 } from 'recharts';
 import { Member, cn, getRechargeRecords, getCardTypes, getMembers, getConsumptionRecords, initStorageData, initRechargeData, initCardTypes } from '@/lib/utils';
+import { AuthContext } from '@/contexts/authContext';
+import { canExportData } from '@/lib/permissions';
+import {
+  formatMembersForExport,
+  formatRechargesForExport,
+  formatConsumptionsForExport,
+  formatCardTypesForExport,
+  exportMultipleSheets,
+  generateFilename
+} from '@/lib/exportUtils';
 
 // 状态标签样式
 const StatusBadge = ({ status }: { status: string }) => {
@@ -49,13 +58,14 @@ const WarningBadge = ({ daysLeft }: { daysLeft: number }) => {
 
 // 统计卡片组件
 const StatCard = ({
-  title, value, change, icon, color
+  title, value, change, icon, color, compareText = '较上月'
 }: {
   title: string,
   value: string | number,
   change: string,
   icon: string,
-  color: string
+  color: string,
+  compareText?: string
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -77,7 +87,7 @@ const StatCard = ({
             ) : (
               <i className="fa-solid fa-arrow-down mr-1 transform transition-transform duration-500"></i>
             )}
-            {change} 较上月
+            {change} {compareText}
           </div>
         </div>
         <div className={`p-3 rounded-lg text-white ${color} shadow-md transform transition-transform duration-500 ${isHovered ? 'scale-110' : ''}`}>
@@ -90,6 +100,7 @@ const StatCard = ({
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year'>('today');
   const [loading, setLoading] = useState(true);
   const [activeChartData, setActiveChartData] = useState<'revenue' | 'members'>('revenue');
@@ -101,6 +112,127 @@ export default function Dashboard() {
     cardTypesCount: 0,
     timeRange: 'today'
   });
+
+  // 根据时间范围生成比较文本
+  const getCompareText = useCallback((range: 'today' | 'week' | 'month' | 'year'): string => {
+    switch (range) {
+      case 'today':
+        return '较昨日';
+      case 'week':
+        return '较上周';
+      case 'month':
+        return '较上月';
+      case 'year':
+        return '较去年';
+      default:
+        return '较上月';
+    }
+  }, []);
+
+  // 计算对比数据
+  const calculateComparison = useCallback((current: number, previous: number): string => {
+    if (previous === 0) {
+      return current > 0 ? '+100%' : '0%';
+    }
+    const change = ((current - previous) / Math.abs(previous) * 100).toFixed(1);
+    return (current - previous) >= 0 ? `+${change}%` : `${change}%`;
+  }, []);
+
+  // 获取对比期数据
+  const getComparisonData = useCallback((range: 'today' | 'week' | 'month' | 'year') => {
+    const members = getMembers();
+    const recharges = getRechargeRecords();
+    const consumptions = getConsumptionRecords();
+    const today = new Date();
+
+    let currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date;
+
+    switch (range) {
+      case 'today': {
+        currentStart = new Date();
+        currentStart.setHours(0, 0, 0, 0);
+        currentEnd = new Date();
+        currentEnd.setHours(23, 59, 59, 999);
+        previousStart = new Date(currentStart);
+        previousStart.setDate(previousStart.getDate() - 1);
+        previousEnd = new Date(currentEnd);
+        previousEnd.setDate(previousEnd.getDate() - 1);
+        break;
+      }
+      case 'week': {
+        const current = new Date();
+        const dayOfWeek = current.getDay() || 7;
+        currentStart = new Date(current);
+        currentStart.setDate(current.getDate() - dayOfWeek + 1);
+        currentStart.setHours(0, 0, 0, 0);
+        currentEnd = new Date(currentStart);
+        currentEnd.setDate(currentEnd.getDate() + 6);
+        currentEnd.setHours(23, 59, 59, 999);
+        previousStart = new Date(currentStart);
+        previousStart.setDate(previousStart.getDate() - 7);
+        previousEnd = new Date(currentEnd);
+        previousEnd.setDate(previousEnd.getDate() - 7);
+        break;
+      }
+      case 'month': {
+        currentStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        currentEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        previousStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        previousEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+        break;
+      }
+      case 'year': {
+        currentStart = new Date(today.getFullYear(), 0, 1);
+        currentEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+        previousStart = new Date(today.getFullYear() - 1, 0, 1);
+        previousEnd = new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+        break;
+      }
+      default:
+        currentStart = new Date();
+        currentEnd = new Date();
+        previousStart = new Date();
+        previousEnd = new Date();
+    }
+
+    const filterByDateRange = <T,>(items: T[], start: Date, end: Date, dateField: keyof T = 'time' as keyof T) => {
+      return items.filter(item => {
+        const value = item[dateField];
+        if (!value) return false;
+        const itemDate = new Date(value as unknown as string);
+        return itemDate >= start && itemDate <= end;
+      });
+    };
+
+    const currentRecharges = filterByDateRange(recharges, currentStart, currentEnd);
+    const previousRecharges = filterByDateRange(recharges, previousStart, previousEnd);
+    const currentConsumptions = filterByDateRange(consumptions, currentStart, currentEnd);
+    const previousConsumptions = filterByDateRange(consumptions, previousStart, previousEnd);
+    const currentMembers = filterByDateRange(members, currentStart, currentEnd, 'joinDate');
+    const previousMembers = filterByDateRange(members, previousStart, previousEnd, 'joinDate');
+
+    return {
+      rechargeAmount: {
+        current: currentRecharges.reduce((sum, r) => sum + (r.amount || 0), 0),
+        previous: previousRecharges.reduce((sum, r) => sum + (r.amount || 0), 0)
+      },
+      consumptionAmount: {
+        current: currentConsumptions.reduce((sum, c) => sum + (c.amount || 0), 0),
+        previous: previousConsumptions.reduce((sum, c) => sum + (c.amount || 0), 0)
+      },
+      newMembers: {
+        current: currentMembers.length,
+        previous: previousMembers.length
+      },
+      totalMembers: {
+        current: members.length,
+        previous: Math.max(0, members.length - currentMembers.length)
+      }
+    };
+  }, []);
+
+  const comparisonData = useMemo(() => getComparisonData(timeRange), [getComparisonData, timeRange]);
+  const compareText = useMemo(() => getCompareText(timeRange), [getCompareText, timeRange]);
 
   // 从数据库获取数据并处理
   const getDashboardData = useCallback((timeRange: 'today' | 'week' | 'month' | 'year') => {
@@ -511,45 +643,79 @@ export default function Dashboard() {
 
   // 导出数据
   const handleExportData = useCallback(() => {
-    toast.info('正在导出数据，请稍候...');
+    if (!canExportData(user)) {
+      toast.error('您没有权限导出数据，请联系管理员');
+      return;
+    }
+
     try {
-      // 准备Excel数据
-      const headers = ['日期', '营业额', '会员数', '充值额'];
+      toast.info('正在导出仪表盘数据，请稍候...');
 
-      // 转换数据格式
-      const excelData = dashboardData.revenueData.map(item => [
-        item.name,
-        item.revenue,
-        item.members,
-        item.recharges
-      ]);
+      const summarySheet = [
+        {
+          指标: '时间范围',
+          当前: timeRange === 'today' ? '今日' : timeRange === 'week' ? '本周' : timeRange === 'month' ? '本月' : '全年',
+          对比: compareText,
+        },
+        {
+          指标: '总会员数',
+          当前: dashboardData.totalMembers,
+          对比增长: calculateComparison(comparisonData.totalMembers.current, comparisonData.totalMembers.previous)
+        },
+        {
+          指标: '新增会员数',
+          当前: comparisonData.newMembers.current,
+          对比增长: calculateComparison(comparisonData.newMembers.current, comparisonData.newMembers.previous)
+        },
+        {
+          指标: '消费总额',
+          当前: comparisonData.consumptionAmount.current,
+          对比增长: calculateComparison(comparisonData.consumptionAmount.current, comparisonData.consumptionAmount.previous)
+        },
+        {
+          指标: '充值总额',
+          当前: comparisonData.rechargeAmount.current,
+          对比增长: calculateComparison(comparisonData.rechargeAmount.current, comparisonData.rechargeAmount.previous)
+        }
+      ];
 
-      // 创建工作簿和工作表
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...excelData]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '仪表盘数据');
+      const revenueSheet = dashboardData.revenueData.map(item => ({
+        维度: item.name,
+        营业额: item.revenue,
+        新增会员: item.members ?? 0,
+        充值金额: item.recharges ?? 0,
+        总会员数: item.totalMembers ?? dashboardData.totalMembers,
+      }));
 
-      // 生成Excel文件
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      const serviceSheet = serviceData.map(item => ({
+        服务项目: item.name,
+        消费次数: item.value,
+      }));
 
-      // 创建下载链接
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `仪表盘数据_${timeRange === 'month' ? '本月' : '全年'}_${new Date().toLocaleDateString()}.xlsx`);
-      link.style.visibility = 'hidden';
+      const timeDistributionSheet = timeDistributionData.map(item => ({
+        时段: item.name,
+        消费次数: item.value,
+      }));
 
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const sheets = [
+        { data: summarySheet, sheetName: '仪表盘概要' },
+        { data: revenueSheet, sheetName: '营收趋势' },
+      ];
 
-      toast.success('数据导出成功！');
+      if (serviceSheet.length > 0) {
+        sheets.push({ data: serviceSheet, sheetName: '热门服务' });
+      }
+
+      if (timeDistributionSheet.length > 0) {
+        sheets.push({ data: timeDistributionSheet, sheetName: '消费时段分布' });
+      }
+
+      exportMultipleSheets(sheets, generateFilename('仪表盘数据'));
     } catch (error) {
       console.error('导出数据失败:', error);
       toast.error('导出数据失败，请重试');
     }
-  }, [dashboardData.revenueData, timeRange]);
+  }, [user, timeRange, compareText, comparisonData, dashboardData.revenueData, dashboardData.totalMembers, serviceData, timeDistributionData, calculateComparison]);
 
   // 刷新数据
   const handleRefresh = useCallback(() => {
@@ -671,48 +837,54 @@ export default function Dashboard() {
         <>
           {/* 统计卡片 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6">
-            <StatCard
-              title="总会员数"
-              value={dashboardData.totalMembers}
-              change="+12%"
-              icon="fa-users"
-              color="bg-blue-100 text-blue-600"
-            />
-            <StatCard
-              title="本月新增会员"
-              value={dashboardData.revenueData[dashboardData.revenueData.length - 1]?.members || 0}
-              change="+2"
-              icon="fa-user-plus"
-              color="bg-green-100 text-green-600"
-            />
-            <StatCard
-              title="本月消费总额"
-              value={`¥${dashboardData.monthlyConsumptionAmount.toLocaleString()}`}
-              change="+8%"
-              icon="fa-credit-card"
-              color="bg-purple-100 text-purple-600"
-            />
-            <StatCard
-              title="本月充值总额"
-              value={`¥${dashboardData.monthlyRechargeAmount.toLocaleString()}`}
-              change="+23%"
-              icon="fa-wallet"
-              color="bg-green-100 text-green-600"
-            />
-            <StatCard
-              title="次卡类型数量"
-              value={dashboardData.cardTypesCount}
-              change="+1"
-              icon="fa-ticket-alt"
-              color="bg-red-100 text-red-600"
-            />
-            <StatCard
-              title="活跃会员数"
-              value={Math.floor(dashboardData.totalMembers * 0.65)}
-              change="+5%"
-              icon="fa-user-check"
-              color="bg-teal-100 text-teal-600"
-            />
+                <StatCard
+                  title="总会员数"
+                  value={dashboardData.totalMembers}
+                  change={calculateComparison(comparisonData.totalMembers.current, comparisonData.totalMembers.previous)}
+                  icon="fa-users"
+                  color="bg-blue-100 text-blue-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title={timeRange === 'today' ? '今日新增会员' : timeRange === 'week' ? '本周新增会员' : timeRange === 'month' ? '本月新增会员' : '本年新增会员'}
+                  value={comparisonData.newMembers.current}
+                  change={calculateComparison(comparisonData.newMembers.current, comparisonData.newMembers.previous)}
+                  icon="fa-user-plus"
+                  color="bg-green-100 text-green-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title={timeRange === 'today' ? '今日消费总额' : timeRange === 'week' ? '本周消费总额' : timeRange === 'month' ? '本月消费总额' : '全年消费总额'}
+                  value={`¥${comparisonData.consumptionAmount.current.toLocaleString()}`}
+                  change={calculateComparison(comparisonData.consumptionAmount.current, comparisonData.consumptionAmount.previous)}
+                  icon="fa-credit-card"
+                  color="bg-purple-100 text-purple-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title={timeRange === 'today' ? '今日充值总额' : timeRange === 'week' ? '本周充值总额' : timeRange === 'month' ? '本月充值总额' : '全年充值总额'}
+                  value={`¥${comparisonData.rechargeAmount.current.toLocaleString()}`}
+                  change={calculateComparison(comparisonData.rechargeAmount.current, comparisonData.rechargeAmount.previous)}
+                  icon="fa-wallet"
+                  color="bg-green-100 text-green-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title="次卡类型数量"
+                  value={dashboardData.cardTypesCount}
+                  change="+0%"
+                  icon="fa-ticket-alt"
+                  color="bg-red-100 text-red-600"
+                  compareText={compareText}
+                />
+                <StatCard
+                  title="活跃会员数"
+                  value={Math.floor(dashboardData.totalMembers * 0.65)}
+                  change={calculateComparison(Math.floor(dashboardData.totalMembers * 0.65), Math.floor(comparisonData.totalMembers.previous * 0.65))}
+                  icon="fa-user-check"
+                  color="bg-teal-100 text-teal-600"
+                  compareText={compareText}
+                />
           </div>
 
           {/* 图表区域 */}
