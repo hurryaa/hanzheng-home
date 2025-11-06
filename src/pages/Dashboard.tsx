@@ -1,5 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import * as XLSX from 'xlsx';
+import React, { useEffect, useState, useCallback, useMemo, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -8,6 +7,16 @@ import {
   Cell
 } from 'recharts';
 import { Member, cn, getRechargeRecords, getCardTypes, getMembers, getConsumptionRecords, initStorageData, initRechargeData, initCardTypes } from '@/lib/utils';
+import { AuthContext } from '@/contexts/authContext';
+import { canExportData } from '@/lib/permissions';
+import {
+  formatMembersForExport,
+  formatRechargesForExport,
+  formatConsumptionsForExport,
+  formatCardTypesForExport,
+  exportMultipleSheets,
+  generateFilename
+} from '@/lib/exportUtils';
 
 // 状态标签样式
 const StatusBadge = ({ status }: { status: string }) => {
@@ -91,6 +100,7 @@ const StatCard = ({
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year'>('today');
   const [loading, setLoading] = useState(true);
   const [activeChartData, setActiveChartData] = useState<'revenue' | 'members'>('revenue');
@@ -633,45 +643,79 @@ export default function Dashboard() {
 
   // 导出数据
   const handleExportData = useCallback(() => {
-    toast.info('正在导出数据，请稍候...');
+    if (!canExportData(user)) {
+      toast.error('您没有权限导出数据，请联系管理员');
+      return;
+    }
+
     try {
-      // 准备Excel数据
-      const headers = ['日期', '营业额', '会员数', '充值额'];
+      toast.info('正在导出仪表盘数据，请稍候...');
 
-      // 转换数据格式
-      const excelData = dashboardData.revenueData.map(item => [
-        item.name,
-        item.revenue,
-        item.members,
-        item.recharges
-      ]);
+      const summarySheet = [
+        {
+          指标: '时间范围',
+          当前: timeRange === 'today' ? '今日' : timeRange === 'week' ? '本周' : timeRange === 'month' ? '本月' : '全年',
+          对比: compareText,
+        },
+        {
+          指标: '总会员数',
+          当前: dashboardData.totalMembers,
+          对比增长: calculateComparison(comparisonData.totalMembers.current, comparisonData.totalMembers.previous)
+        },
+        {
+          指标: '新增会员数',
+          当前: comparisonData.newMembers.current,
+          对比增长: calculateComparison(comparisonData.newMembers.current, comparisonData.newMembers.previous)
+        },
+        {
+          指标: '消费总额',
+          当前: comparisonData.consumptionAmount.current,
+          对比增长: calculateComparison(comparisonData.consumptionAmount.current, comparisonData.consumptionAmount.previous)
+        },
+        {
+          指标: '充值总额',
+          当前: comparisonData.rechargeAmount.current,
+          对比增长: calculateComparison(comparisonData.rechargeAmount.current, comparisonData.rechargeAmount.previous)
+        }
+      ];
 
-      // 创建工作簿和工作表
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...excelData]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '仪表盘数据');
+      const revenueSheet = dashboardData.revenueData.map(item => ({
+        维度: item.name,
+        营业额: item.revenue,
+        新增会员: item.members ?? 0,
+        充值金额: item.recharges ?? 0,
+        总会员数: item.totalMembers ?? dashboardData.totalMembers,
+      }));
 
-      // 生成Excel文件
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      const serviceSheet = serviceData.map(item => ({
+        服务项目: item.name,
+        消费次数: item.value,
+      }));
 
-      // 创建下载链接
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `仪表盘数据_${timeRange === 'month' ? '本月' : '全年'}_${new Date().toLocaleDateString()}.xlsx`);
-      link.style.visibility = 'hidden';
+      const timeDistributionSheet = timeDistributionData.map(item => ({
+        时段: item.name,
+        消费次数: item.value,
+      }));
 
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const sheets = [
+        { data: summarySheet, sheetName: '仪表盘概要' },
+        { data: revenueSheet, sheetName: '营收趋势' },
+      ];
 
-      toast.success('数据导出成功！');
+      if (serviceSheet.length > 0) {
+        sheets.push({ data: serviceSheet, sheetName: '热门服务' });
+      }
+
+      if (timeDistributionSheet.length > 0) {
+        sheets.push({ data: timeDistributionSheet, sheetName: '消费时段分布' });
+      }
+
+      exportMultipleSheets(sheets, generateFilename('仪表盘数据'));
     } catch (error) {
       console.error('导出数据失败:', error);
       toast.error('导出数据失败，请重试');
     }
-  }, [dashboardData.revenueData, timeRange]);
+  }, [user, timeRange, compareText, comparisonData, dashboardData.revenueData, dashboardData.totalMembers, serviceData, timeDistributionData, calculateComparison]);
 
   // 刷新数据
   const handleRefresh = useCallback(() => {

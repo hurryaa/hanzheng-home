@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext, type AuthUser } from '@/contexts/authContext';
 import { validateAndInitData } from '@/lib/utils';
 import { useAccessibility } from '@/hooks/useAccessibility';
+import { getUserPermissions } from '@/lib/permissions';
 
 // 页面组件
 import Login from "@/pages/Login";
@@ -92,6 +93,7 @@ export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const { announce } = useAccessibility();
      
   // 检查本地存储中的认证状态和初始化数据
@@ -101,9 +103,10 @@ export default function App() {
     
     if (savedToken && savedUser) {
       try {
-        const parsedUser = JSON.parse(savedUser);
+        const parsedUser: AuthUser = JSON.parse(savedUser);
         setToken(savedToken);
         setUser(parsedUser);
+        setPermissions(getUserPermissions(parsedUser));
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Failed to parse user info:', error);
@@ -122,6 +125,7 @@ export default function App() {
     setIsAuthenticated(true);
     setToken(token);
     setUser(user);
+    setPermissions(getUserPermissions(user));
     localStorage.setItem('authToken', token);
     localStorage.setItem('userInfo', JSON.stringify(user));
   };
@@ -130,9 +134,18 @@ export default function App() {
     setIsAuthenticated(false);
     setToken(null);
     setUser(null);
+    setPermissions([]);
     localStorage.removeItem('authToken');
     localStorage.removeItem('userInfo');
   };
+
+  const hasPermission = useCallback((permission: string) => {
+    return permissions.includes(permission);
+  }, [permissions]);
+
+  const isAdminUser = useCallback(() => {
+    return user?.role === 'admin';
+  }, [user]);
 
   if (loading) {
     return (
@@ -147,7 +160,16 @@ export default function App() {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, token, user, login, logout }}
+      value={{ 
+        isAuthenticated, 
+        token, 
+        user, 
+        permissions, 
+        hasPermission, 
+        isAdmin: isAdminUser, 
+        login, 
+        logout 
+      }}
     >
       {/* 跳转到主内容链接 - 可访问性增强 */}
       <a
