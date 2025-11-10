@@ -15,3 +15,5 @@ export { Badge, StatusBadge, CountBadge } from './Badge';
 export type { BadgeProps, StatusBadgeProps, CountBadgeProps } from './Badge';
 
 export { default as ConfirmDialog, useConfirmDialog } from './ConfirmDialog';
+
+export { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';

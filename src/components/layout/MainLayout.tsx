@@ -7,12 +7,14 @@ import { AuthContext } from '@/contexts/authContext';
 import { Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@/App';
 import { useAccessibility } from '@/hooks/useAccessibility';
-
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { KeyboardShortcutsHelp } from '@/components/ui';
 
 export default function MainLayout() {
   const { isAuthenticated } = useContext(AuthContext);
   const location = useLocation();
   const { announce } = useAccessibility();
+  useKeyboardShortcuts();
 
   // 监听路由变化，重置滚动位置并强制重新渲染
   useEffect(() => {
@@ -20,13 +22,15 @@ export default function MainLayout() {
 
     // 为屏幕阅读器用户公告页面变化
     const pageNames: Record<string, string> = {
+      '/home': '工作台',
       '/dashboard': '仪表板',
+      '/members': '会员管理',
+      '/appointments': '预约管理',
       '/consumptions': '消费日志',
       '/recharges': '充值记录',
       '/member-cards': '次卡管理',
-      '/members': '会员管理',
       '/settings': '系统设置',
-      '/home': '首页'
+      '/profile': '个人资料'
     };
 
     const pageName = pageNames[location.pathname] || '页面';
@@ -80,6 +84,9 @@ export default function MainLayout() {
           <p>© 2025 汗蒸养生馆管理系统. 保留所有权利.</p>
         </footer>
       </div>
+
+      {/* 键盘快捷键帮助 */}
+      <KeyboardShortcutsHelp />
     </div>
   );
 }

@@ -14,6 +14,9 @@ import Recharges from "@/pages/Recharges";
 import MemberCards from "@/pages/MemberCards";
 import Members from "@/pages/Members";
 import Settings from "@/pages/Settings";
+import Appointments from "@/pages/Appointments";
+import Profile from "@/pages/Profile";
+import NotFound from "@/pages/NotFound";
 
 // 布局组件
 import MainLayout from "@/components/layout/MainLayout";
@@ -194,13 +197,16 @@ export default function App() {
             <Route path="recharges" element={<ProtectedRoute><Recharges /></ProtectedRoute>} />
             <Route path="member-cards" element={<ProtectedRoute><MemberCards /></ProtectedRoute>} />
             <Route path="members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
+            <Route path="appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
             <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
            {/* 确保每次路由切换时正确卸载组件 */}
           </Route>
 
           {/* 404 路由 */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
     </AuthContext.Provider>

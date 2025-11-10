@@ -84,68 +84,40 @@ export default function Header() {
             {/* 通知中心 */}
             <div className="relative">
               <button
-                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                onClick={() => {
+                  setNotificationsOpen(!notificationsOpen);
+                  setUserMenuOpen(false);
+                }}
                 className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200 relative"
                 aria-label="查看通知"
+                title="通知中心"
               >
                 <i className="fa-solid fa-bell"></i>
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
               </button>
 
               {notificationsOpen && (
-                <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 animate-fadeIn">
+                <div 
+                  className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 animate-fadeIn"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="py-1" role="menu" aria-orientation="vertical">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                      <h3 className="font-semibold text-gray-800">通知</h3>
+                    <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-800">通知中心</h3>
+                      <button
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                        aria-label="关闭"
+                      >
+                        <i className="fa-solid fa-times"></i>
+                      </button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
-                      {/* 通知项 */}
-                      <a
-                        href="#"
-                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-start"
-                        role="menuitem"
-                      >
-                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                          <i className="fa-solid fa-credit-card"></i>
-                        </div>
-                        <div>
-                          <p>会员张三刚刚充值了1000元</p>
-                          <p className="text-xs text-gray-500 mt-1">10分钟前</p>
-                        </div>
-                      </a>
-                      
-                      <a
-                        href="#"
-                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-start"
-                        role="menuitem"
-                      >
-                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
-                          <i className="fa-solid fa-ticket-alt"></i>
-                        </div>
-                        <div>
-                          <p>会员李四购买了30次汗蒸次卡</p>
-                          <p className="text-xs text-gray-500 mt-1">1小时前</p>
-                        </div>
-                      </a>
-                      
-                      <a
-                        href="#"
-                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-start"
-                        role="menuitem"
-                      >
-                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 mr-3">
-                          <i className="fa-solid fa-exclamation-circle"></i>
-                        </div>
-                        <div>
-                          <p>王五的次卡即将过期（剩余3天）</p>
-                          <p className="text-xs text-gray-500 mt-1">2小时前</p>
-                        </div>
-                      </a>
-                    </div>
-                    <div className="px-4 py-2 border-t border-gray-200">
-                      <a href="#" className="text-sm text-blue-600 hover:text-blue-800 font-medium text-center block">
-                        查看所有通知
-                      </a>
+                      <div className="p-8 text-center text-gray-500">
+                        <i className="fa-solid fa-bell-slash text-4xl mb-3 text-gray-300"></i>
+                        <p className="text-sm">暂无新通知</p>
+                        <p className="text-xs mt-1">系统会在有新动态时通知您</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -155,7 +127,10 @@ export default function Header() {
             {/* 用户菜单 */}
             <div className="relative">
               <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => {
+                  setUserMenuOpen(!userMenuOpen);
+                  setNotificationsOpen(false);
+                }}
                 className="flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 id="user-menu-button"
                 aria-expanded={userMenuOpen}

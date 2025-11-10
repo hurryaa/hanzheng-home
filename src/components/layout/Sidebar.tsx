@@ -13,9 +13,21 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [{
+    title: "工作台",
+    icon: "fa-house",
+    path: "/home"
+}, {
     title: "仪表板",
     icon: "fa-tachometer-alt",
     path: "/dashboard"
+}, {
+    title: "会员管理",
+    icon: "fa-users",
+    path: "/members"
+}, {
+    title: "预约管理",
+    icon: "fa-calendar-check",
+    path: "/appointments"
 }, {
     title: "消费管理",
     icon: "fa-receipt",
@@ -28,10 +40,6 @@ const menuItems: MenuItem[] = [{
     title: "次卡管理",
     icon: "fa-ticket-alt",
     path: "/member-cards"
-}, {
-    title: "会员管理",
-    icon: "fa-users",
-    path: "/members"
 }, {
     title: "系统设置",
     icon: "fa-cog",
