@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { toast } from 'sonner';
 import { storage } from '@/lib/utils';
+import { generateInviteLink, generateInviteCode, generateQRCodeDataUrl, downloadQRCode } from '@/lib/inviteUtils';
 
 interface DistributorStats {
   level: string;
@@ -29,6 +30,8 @@ export default function DistributorCenter() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteQRCode, setInviteQRCode] = useState<string | null>(null);
+  const [loadingQR, setLoadingQR] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -102,17 +105,29 @@ export default function DistributorCenter() {
     });
 
     setInvitedMembers(invited);
-    setInviteCode(distributor.inviteCode || generateInviteCode(user?.id || ''));
-    setInviteUrl(distributor.inviteUrl || generateInviteUrl(user?.id || ''));
+    
+    const code = distributor?.inviteCode || generateInviteCode(user?.id || '');
+    const url = distributor?.inviteUrl || generateInviteLink(user?.id || '');
+    setInviteCode(code);
+    setInviteUrl(url);
+    
+    // 自动生成邀请链接的二维码
+    generateQRCodeForInviteLink(url);
   };
 
-  const generateInviteCode = (userId: string): string => {
-    return userId.substring(0, 8).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
-  };
-
-  const generateInviteUrl = (userId: string): string => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/register?referrer=${userId}`;
+  const generateQRCodeForInviteLink = async (inviteLink: string) => {
+    try {
+      setLoadingQR(true);
+      const qrDataUrl = await generateQRCodeDataUrl(inviteLink, {
+        width: 250,
+        margin: 2,
+      });
+      setInviteQRCode(qrDataUrl);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+    } finally {
+      setLoadingQR(false);
+    }
   };
 
   const handleCopyCode = () => {
@@ -123,6 +138,15 @@ export default function DistributorCenter() {
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(inviteUrl);
     toast.success('邀请链接已复制！');
+  };
+
+  const handleDownloadQRCode = async () => {
+    try {
+      await downloadQRCode(inviteUrl, `邀请码-${inviteCode}.png`);
+      toast.success('二维码已下载');
+    } catch (error) {
+      toast.error('下载失败');
+    }
   };
 
   const commissionRates: Record<string, number> = {
@@ -225,14 +249,33 @@ export default function DistributorCenter() {
               <p className="text-xs text-gray-600">敬请期待</p>
             </div>
           </div>
-          <button
-            disabled
-            className="w-full px-4 py-2.5 bg-gray-300 text-gray-600 rounded-lg font-medium cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <i className="fa-solid fa-qrcode"></i>
-            生成二维码
-          </button>
-          <p className="text-xs text-gray-600 mt-3">将二维码分享给好友扫描</p>
+          {inviteQRCode ? (
+            <div className="space-y-3">
+              <div className="bg-white rounded-lg p-4 flex justify-center">
+                <img 
+                  src={inviteQRCode} 
+                  alt="邀请链接二维码" 
+                  className="w-32 h-32 rounded-lg"
+                />
+              </div>
+              <button
+                onClick={handleDownloadQRCode}
+                className="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-download"></i>
+                下载二维码
+              </button>
+            </div>
+          ) : (
+            <button
+              disabled
+              className="w-full px-4 py-2.5 bg-gray-300 text-gray-600 rounded-lg font-medium cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <i className="fa-solid fa-spinner fa-spin"></i>
+              生成中...
+            </button>
+          )}
+          <p className="text-xs text-gray-600 mt-3">将二维码分享给好友扫描，好友扫描后自动关联邀请</p>
         </div>
       </div>
 

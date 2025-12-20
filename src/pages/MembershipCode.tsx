@@ -1,11 +1,38 @@
-import React, { useContext, useRef } from 'react';
+import React, { useContext, useRef, useEffect, useState } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { toast } from 'sonner';
 import { getMemberById } from '@/lib/utils';
+import { generateQRCodeDataUrl, generateInviteLink } from '@/lib/inviteUtils';
 
 export default function MembershipCode() {
   const { user } = useContext(AuthContext);
   const qrCodeRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.id) {
+      generateQRCode();
+    }
+  }, [user?.id]);
+
+  const generateQRCode = async () => {
+    try {
+      setLoading(true);
+      const inviteLink = generateInviteLink(user?.id || '');
+      const dataUrl = await generateQRCodeDataUrl(inviteLink, {
+        width: 300,
+        margin: 2,
+      });
+      setQrCodeUrl(dataUrl);
+    } catch (error) {
+      console.error('生成二维码失败:', error);
+      toast.error('二维码生成失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) {
     return <div>加载中...</div>;
@@ -60,39 +87,21 @@ export default function MembershipCode() {
               className="bg-white rounded-lg p-6 mb-8"
               style={{ minWidth: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
             >
-              <div style={{ width: '250px', height: '250px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <svg width="250" height="250" viewBox="0 0 250 250" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* 简单的二维码示意图 */}
-                  <rect width="250" height="250" fill="white" />
-                  <g fill="black" opacity="0.8">
-                    {/* 顶左位置标记 */}
-                    <rect x="10" y="10" width="50" height="50" />
-                    <rect x="20" y="20" width="30" height="30" fill="white" />
-                    <rect x="25" y="25" width="20" height="20" />
-                    {/* 顶右位置标记 */}
-                    <rect x="190" y="10" width="50" height="50" />
-                    <rect x="200" y="20" width="30" height="30" fill="white" />
-                    <rect x="205" y="25" width="20" height="20" />
-                    {/* 底左位置标记 */}
-                    <rect x="10" y="190" width="50" height="50" />
-                    <rect x="20" y="200" width="30" height="30" fill="white" />
-                    <rect x="25" y="205" width="20" height="20" />
-                    {/* 中间数据区域 */}
-                    <rect x="70" y="70" width="15" height="15" />
-                    <rect x="90" y="70" width="15" height="15" />
-                    <rect x="110" y="70" width="15" height="15" />
-                    <rect x="130" y="70" width="15" height="15" />
-                    <rect x="70" y="90" width="15" height="15" />
-                    <rect x="90" y="110" width="15" height="15" />
-                    <rect x="110" y="130" width="15" height="15" />
-                    <rect x="130" y="110" width="15" height="15" />
-                    <rect x="150" y="130" width="15" height="15" />
-                    <rect x="150" y="150" width="15" height="15" />
-                    <rect x="170" y="150" width="15" height="15" />
-                    <rect x="170" y="170" width="15" height="15" />
-                  </g>
-                </svg>
-              </div>
+              {loading ? (
+                <div style={{ width: '250px', height: '250px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <i className="fa-solid fa-spinner fa-spin text-4xl text-blue-600"></i>
+                </div>
+              ) : qrCodeUrl ? (
+                <img 
+                  src={qrCodeUrl} 
+                  alt="会员码二维码" 
+                  style={{ width: '250px', height: '250px', borderRadius: '8px' }}
+                />
+              ) : (
+                <div className="text-center text-gray-600">
+                  <p>二维码生成失败，请刷新重试</p>
+                </div>
+              )}
             </div>
 
             {/* 会员码文字 */}

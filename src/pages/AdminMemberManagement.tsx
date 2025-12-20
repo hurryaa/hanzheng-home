@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import apiClient from '@/lib/apiClient';
 import { getMemberById } from '@/lib/utils';
+import { exportMembers } from '@/lib/exportUtils';
 
 interface Member {
   id: string;
@@ -205,13 +206,20 @@ export default function AdminMemberManagement() {
             </select>
           </div>
 
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
               onClick={() => handleOpenModal()}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
             >
               <i className="fa-solid fa-plus mr-2"></i>
               新增会员
+            </button>
+            <button
+              onClick={() => exportMembers(members)}
+              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition"
+            >
+              <i className="fa-solid fa-download mr-2"></i>
+              导出CSV
             </button>
           </div>
         </div>

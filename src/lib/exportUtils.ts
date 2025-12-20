@@ -1,294 +1,272 @@
-import * as XLSX from 'xlsx';
-import { toast } from 'sonner';
-import { Member, RechargeRecord, ConsumptionRecord, CardType } from './utils';
+/**
+ * 数据导出工具库
+ * 支持CSV、Excel等格式导出
+ */
 
-// 定义导出数据类型
-export type ExportDataType = 'members' | 'recharges' | 'consumptions' | 'cardTypes' | 'all';
+/**
+ * 将数据转换为CSV格式
+ */
+export const convertToCSV = (data: any[], headers?: string[]): string => {
+  if (data.length === 0) {
+    return '';
+  }
 
-// 会员数据导出格式化
-export function formatMembersForExport(members: Member[]) {
-  return members.map(member => ({
-    '会员编号': member.id,
+  // 如果没有指定headers，从第一行数据的key提取
+  const csvHeaders = headers || Object.keys(data[0]);
+  
+  // 构建header行
+  const headerRow = csvHeaders.map(escapeCSVField).join(',');
+  
+  // 构建数据行
+  const dataRows = data.map((row) =>
+    csvHeaders.map((header) => {
+      const value = row[header];
+      return escapeCSVField(value);
+    }).join(',')
+  );
+  
+  return [headerRow, ...dataRows].join('\n');
+};
+
+/**
+ * 转义CSV字段（处理包含逗号、引号等特殊字符）
+ */
+const escapeCSVField = (field: any): string => {
+  if (field === null || field === undefined) {
+    return '';
+  }
+
+  let value = String(field);
+
+  // 如果包含逗号、引号或换行，需要用引号包围
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    // 双引号转义为两个双引号
+    value = value.replace(/"/g, '""');
+    value = `"${value}"`;
+  }
+
+  return value;
+};
+
+/**
+ * 下载CSV文件
+ */
+export const downloadCSV = (csvContent: string, fileName: string = 'export.csv'): void => {
+  const link = document.createElement('a');
+  link.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+/**
+ * 导出会员列表
+ */
+export const exportMembers = (members: any[], fileName?: string): void => {
+  const headers = ['会员ID', '姓名', '电话', '邮箱', '加入时间', '状态'];
+  
+  const data = members.map((member) => ({
+    '会员ID': member.id,
     '姓名': member.name,
-    '手机号': member.phone,
-    '加入日期': member.joinDate,
-    '余额': member.balance || 0,
-    '次卡类型': member.card?.type || '无',
-    '总次数': member.card?.totalCount || 0,
-    '已使用次数': member.card?.usedCount || 0,
-    '剩余次数': member.card?.remainingCount || 0,
-    '过期日期': member.card?.expiryDate || '无',
+    '电话': member.phone,
+    '邮箱': member.email || '-',
+    '加入时间': member.joinDate
+      ? new Date(member.joinDate).toLocaleDateString('zh-CN')
+      : '-',
+    '状态': member.status === 'active' ? '活跃' : '非活跃',
   }));
-}
 
-// 充值记录导出格式化
-export function formatRechargesForExport(recharges: RechargeRecord[]) {
-  return recharges.map(recharge => ({
-    '充值编号': recharge.id,
-    '会员编号': recharge.memberId,
-    '会员姓名': recharge.memberName,
-    '手机号': recharge.phone,
-    '充值时间': recharge.time,
-    '充值金额': recharge.amount,
-    '充值后余额': recharge.balance,
-    '支付方式': recharge.paymentMethod,
-    '操作员': recharge.operator,
-    '备注': recharge.notes || '',
-  }));
-}
-
-// 消费记录导出格式化
-export function formatConsumptionsForExport(consumptions: ConsumptionRecord[]) {
-  return consumptions.map(consumption => ({
-    '消费编号': consumption.id,
-    '会员编号': consumption.memberId,
-    '会员姓名': consumption.memberName,
-    '手机号': consumption.phone,
-    '消费时间': consumption.time,
-    '服务项目': consumption.service,
-    '服务类别': consumption.category,
-    '消费金额': consumption.amount,
-    '支付方式': consumption.paymentMethod,
-    '使用次卡': consumption.usedCard ? '是' : '否',
-    '状态': consumption.status,
-    '操作员': consumption.operator,
-    '备注': consumption.notes || '',
-  }));
-}
-
-// 次卡类型导出格式化
-export function formatCardTypesForExport(cardTypes: CardType[]) {
-  return cardTypes.map(cardType => ({
-    '次卡编号': cardType.id,
-    '次卡名称': cardType.name,
-    '描述': cardType.description,
-    '价格': cardType.price,
-    '次数': cardType.count,
-    '有效天数': cardType.validityDays,
-    '状态': cardType.active ? '启用' : '禁用',
-  }));
-}
+  const csv = convertToCSV(data, headers);
+  downloadCSV(csv, fileName || `会员列表_${new Date().toISOString().split('T')[0]}.csv`);
+};
 
 /**
- * 导出数据到Excel
- * @param data 要导出的数据
- * @param filename 文件名
- * @param sheetName 工作表名称
+ * 导出佣金记录
  */
-export function exportToExcel(data: any[], filename: string, sheetName: string = 'Sheet1') {
-  try {
-    if (data.length === 0) {
-      toast.warning('没有数据可导出');
-      return;
-    }
+export const exportCommissions = (commissions: any[], fileName?: string): void => {
+  const headers = ['佣金ID', '分销商ID', '用户ID', '金额', '状态', '创建时间'];
+  
+  const data = commissions.map((commission) => ({
+    '佣金ID': commission.id,
+    '分销商ID': commission.distributorId,
+    '用户ID': commission.inviteeId,
+    '金额': `¥${commission.amount.toFixed(2)}`,
+    '状态': getCommissionStatusLabel(commission.status),
+    '创建时间': new Date(commission.createdAt).toLocaleString('zh-CN'),
+  }));
 
-    // 创建工作簿
-    const wb = XLSX.utils.book_new();
-    
-    // 创建工作表
-    const ws = XLSX.utils.json_to_sheet(data);
-    
-    // 设置列宽
-    const colWidths = Object.keys(data[0]).map(key => ({
-      wch: Math.max(key.length, ...data.map(row => String(row[key]).length)) + 2
-    }));
-    ws['!cols'] = colWidths;
-    
-    // 添加工作表到工作簿
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    
-    // 生成Excel文件
-    XLSX.writeFile(wb, filename);
-    
-    toast.success('导出成功！');
-  } catch (error) {
-    console.error('导出失败:', error);
-    toast.error('导出失败，请重试');
-    throw error;
-  }
-}
+  const csv = convertToCSV(data, headers);
+  downloadCSV(csv, fileName || `佣金记录_${new Date().toISOString().split('T')[0]}.csv`);
+};
 
 /**
- * 导出多个工作表到一个Excel文件
- * @param sheets 工作表数据数组
- * @param filename 文件名
+ * 导出核销记录
  */
-export function exportMultipleSheets(
-  sheets: Array<{ data: any[]; sheetName: string }>,
-  filename: string
-) {
-  try {
-    const wb = XLSX.utils.book_new();
-    
-    sheets.forEach(({ data, sheetName }) => {
-      if (data.length > 0) {
-        const ws = XLSX.utils.json_to_sheet(data);
-        
-        // 设置列宽
-        const colWidths = Object.keys(data[0]).map(key => ({
-          wch: Math.max(key.length, ...data.map(row => String(row[key] || '').length)) + 2
-        }));
-        ws['!cols'] = colWidths;
-        
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      }
-    });
-    
-    if (wb.SheetNames.length === 0) {
-      toast.warning('没有数据可导出');
-      return;
-    }
-    
-    XLSX.writeFile(wb, filename);
-    toast.success('导出成功！');
-  } catch (error) {
-    console.error('导出失败:', error);
-    toast.error('导出失败，请重试');
-    throw error;
-  }
-}
+export const exportRedemptions = (redemptions: any[], fileName?: string): void => {
+  const headers = ['核销ID', '会员ID', '门店', '次数', '卡ID', '员工', '时间', '备注'];
+  
+  const data = redemptions.map((record) => ({
+    '核销ID': record.id,
+    '会员ID': record.userId,
+    '门店': record.storeId || '-',
+    '次数': record.sessionsDeducted,
+    '卡ID': record.userPackageId,
+    '员工': record.staffId || '-',
+    '时间': new Date(record.occurredAt).toLocaleString('zh-CN'),
+    '备注': record.remark || '-',
+  }));
+
+  const csv = convertToCSV(data, headers);
+  downloadCSV(csv, fileName || `核销记录_${new Date().toISOString().split('T')[0]}.csv`);
+};
 
 /**
- * 生成带时间戳的文件名
- * @param prefix 文件名前缀
- * @param extension 文件扩展名
+ * 导出购买记录
  */
-export function generateFilename(prefix: string, extension: string = 'xlsx'): string {
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('zh-CN').replace(/\//g, '-');
-  const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false }).replace(/:/g, '-');
-  return `${prefix}_${dateStr}_${timeStr}.${extension}`;
-}
+export const exportPurchases = (purchases: any[], fileName?: string): void => {
+  const headers = ['购买ID', '会员ID', '套餐', '次数', '金额', '门店', '状态', '时间'];
+  
+  const data = purchases.map((record) => ({
+    '购买ID': record.id,
+    '会员ID': record.userId,
+    '套餐': record.packageId || '自定义',
+    '次数': record.sessionsAdded,
+    '金额': `¥${record.amount.toFixed(2)}`,
+    '门店': record.storeId || '-',
+    '状态': getPurchaseStatusLabel(record.status),
+    '时间': new Date(record.occurredAt).toLocaleString('zh-CN'),
+  }));
+
+  const csv = convertToCSV(data, headers);
+  downloadCSV(csv, fileName || `购买记录_${new Date().toISOString().split('T')[0]}.csv`);
+};
 
 /**
- * 导入Excel数据
- * @param file Excel文件
- * @returns Promise<导入的数据>
+ * 导出邀请绑定记录
  */
-export async function importFromExcel(file: File): Promise<Record<string, any[]>> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        const result: Record<string, any[]> = {};
-        
-        workbook.SheetNames.forEach(sheetName => {
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-          result[sheetName] = jsonData;
-        });
-        
-        resolve(result);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    
-    reader.onerror = () => {
-      reject(new Error('文件读取失败'));
-    };
-    
-    reader.readAsArrayBuffer(file);
+export const exportInviteBindings = (bindings: any[], fileName?: string): void => {
+  const headers = ['邀请人', '被邀请人', '绑定时间', '状态'];
+  
+  const data = bindings.map((binding) => ({
+    '邀请人': binding.distributorId,
+    '被邀请人': binding.inviteeId,
+    '绑定时间': new Date(binding.createdAt).toLocaleString('zh-CN'),
+    '状态': binding.status === 'active' ? '活跃' : '已取消',
+  }));
+
+  const csv = convertToCSV(data, headers);
+  downloadCSV(csv, fileName || `邀请关系_${new Date().toISOString().split('T')[0]}.csv`);
+};
+
+/**
+ * 生成综合报表（包含多种数据）
+ */
+export const generateComprehensiveReport = (reportData: {
+  summary: any;
+  members?: any[];
+  commissions?: any[];
+  redemptions?: any[];
+  purchases?: any[];
+}): void => {
+  let report = '汗蒸会员管理系统 - 综合报表\n';
+  report += `生成时间：${new Date().toLocaleString('zh-CN')}\n\n`;
+
+  // 摘要
+  report += '=== 统计摘要 ===\n';
+  Object.entries(reportData.summary).forEach(([key, value]) => {
+    report += `${key}: ${value}\n`;
   });
-}
+  report += '\n';
 
-/**
- * 验证导入的数据格式
- * @param data 导入的数据
- * @param requiredFields 必需字段列表
- */
-export function validateImportData(data: any[], requiredFields: string[]): boolean {
-  if (!Array.isArray(data) || data.length === 0) {
-    toast.error('导入数据为空');
-    return false;
+  // 会员数据
+  if (reportData.members && reportData.members.length > 0) {
+    report += '=== 会员统计 ===\n';
+    report += `总会员数: ${reportData.members.length}\n`;
+    const activeMembersCount = reportData.members.filter((m) => m.status === 'active').length;
+    report += `活跃会员: ${activeMembersCount}\n\n`;
   }
-  
-  const firstRow = data[0];
-  const missingFields = requiredFields.filter(field => !(field in firstRow));
-  
-  if (missingFields.length > 0) {
-    toast.error(`缺少必需字段：${missingFields.join(', ')}`);
-    return false;
+
+  // 佣金统计
+  if (reportData.commissions && reportData.commissions.length > 0) {
+    report += '=== 佣金统计 ===\n';
+    const totalCommission = reportData.commissions.reduce((sum, c) => sum + c.amount, 0);
+    report += `总佣金: ¥${totalCommission.toFixed(2)}\n`;
+    const pendingCommission = reportData.commissions
+      .filter((c) => c.status === 'pending')
+      .reduce((sum, c) => sum + c.amount, 0);
+    report += `待审批: ¥${pendingCommission.toFixed(2)}\n\n`;
   }
-  
-  return true;
-}
+
+  // 下载报表
+  const link = document.createElement('a');
+  link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(report)}`;
+  link.download = `综合报表_${new Date().toISOString().split('T')[0]}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
 /**
- * 转换导入的会员数据
+ * 佣金状态标签
  */
-export function transformImportedMembers(data: any[]): Member[] {
-  return data.map(row => ({
-    id: row['会员编号'] || `M${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
-    name: row['姓名'],
-    phone: row['手机号'],
-    joinDate: row['加入日期'] || new Date().toISOString(),
-    balance: Number(row['余额']) || 0,
-    card: row['次卡类型'] && row['次卡类型'] !== '无' ? {
-      id: `C${Date.now()}`,
-      type: row['次卡类型'],
-      totalCount: Number(row['总次数']) || 0,
-      usedCount: Number(row['已使用次数']) || 0,
-      remainingCount: Number(row['剩余次数']) || 0,
-      expiryDate: row['过期日期'] || new Date().toISOString().split('T')[0]
-    } : undefined
-  }));
-}
+const getCommissionStatusLabel = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    pending: '待审批',
+    available: '可提现',
+    withdrawn: '已提现',
+    rejected: '已拒绝',
+  };
+  return statusMap[status] || status;
+};
 
 /**
- * 转换导入的充值记录
+ * 购买状态标签
  */
-export function transformImportedRecharges(data: any[]): RechargeRecord[] {
-  return data.map(row => ({
-    id: row['充值编号'] || `R${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
-    memberId: row['会员编号'],
-    memberName: row['会员姓名'],
-    phone: row['手机号'],
-    time: row['充值时间'],
-    amount: Number(row['充值金额']) || 0,
-    balance: Number(row['充值后余额']) || 0,
-    paymentMethod: row['支付方式'],
-    operator: row['操作员'],
-    notes: row['备注'] || ''
-  }));
-}
+const getPurchaseStatusLabel = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    confirmed: '已确认',
+    void: '已作废',
+    refunded: '已退款',
+  };
+  return statusMap[status] || status;
+};
 
 /**
- * 转换导入的消费记录
+ * 批量导出多种报表
  */
-export function transformImportedConsumptions(data: any[]): ConsumptionRecord[] {
-  return data.map(row => ({
-    id: row['消费编号'] || `C${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
-    memberId: row['会员编号'],
-    memberName: row['会员姓名'],
-    phone: row['手机号'],
-    time: row['消费时间'],
-    service: row['服务项目'],
-    category: row['服务类别'],
-    amount: Number(row['消费金额']) || 0,
-    paymentMethod: row['支付方式'],
-    usedCard: row['使用次卡'] === '是',
-    status: (row['状态'] || '已完成') as '已完成' | '已取消' | '进行中',
-    operator: row['操作员'],
-    notes: row['备注'] || ''
-  }));
-}
+export const exportBatchReports = (reports: {
+  members?: any[];
+  commissions?: any[];
+  redemptions?: any[];
+  purchases?: any[];
+}): void => {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const exportMap: Record<string, [any[], string]> = {
+    members: [reports.members || [], `会员列表_${timestamp}.csv`],
+    commissions: [reports.commissions || [], `佣金记录_${timestamp}.csv`],
+    redemptions: [reports.redemptions || [], `核销记录_${timestamp}.csv`],
+    purchases: [reports.purchases || [], `购买记录_${timestamp}.csv`],
+  };
 
-/**
- * 转换导入的次卡类型
- */
-export function transformImportedCardTypes(data: any[]): CardType[] {
-  return data.map(row => ({
-    id: row['次卡编号'] || `CT${Date.now()}${Math.random().toString(36).substr(2, 4)}`,
-    name: row['次卡名称'],
-    description: row['描述'],
-    price: Number(row['价格']) || 0,
-    count: Number(row['次数']) || 0,
-    validityDays: Number(row['有效天数']) || 365,
-    active: row['状态'] === '启用'
-  }));
-}
+  // 为了简化，这里返回一个zip文件的创建（需要额外的库支持）
+  // 或者逐个下载
+  Object.entries(exportMap).forEach(([key, [data, fileName]]) => {
+    if (data.length > 0) {
+      switch (key) {
+        case 'members':
+          exportMembers(data, fileName);
+          break;
+        case 'commissions':
+          exportCommissions(data, fileName);
+          break;
+        case 'redemptions':
+          exportRedemptions(data, fileName);
+          break;
+        case 'purchases':
+          exportPurchases(data, fileName);
+          break;
+      }
+    }
+  });
+};

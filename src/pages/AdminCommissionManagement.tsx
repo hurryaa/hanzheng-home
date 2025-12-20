@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import apiClient from '@/lib/apiClient';
+import { exportCommissions } from '@/lib/exportUtils';
 
 interface CommissionRecord {
   id: string;
@@ -208,6 +209,13 @@ export default function AdminCommissionManagement() {
           >
             <i className="fa-solid fa-check-double"></i>
             已提现 ({stats.withdrawn})
+          </button>
+          <button
+            onClick={() => exportCommissions(records)}
+            className="px-4 py-2 rounded-lg font-medium text-sm transition flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+          >
+            <i className="fa-solid fa-download"></i>
+            导出CSV
           </button>
         </div>
       </div>
