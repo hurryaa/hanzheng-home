@@ -14,9 +14,25 @@ import Recharges from "@/pages/Recharges";
 import MemberCards from "@/pages/MemberCards";
 import Members from "@/pages/Members";
 import Settings from "@/pages/Settings";
+import StaffLogin from "@/pages/StaffLogin";
+import StaffDashboard from "@/pages/StaffDashboard";
+import StaffMemberQuery from "@/pages/StaffMemberQuery";
+import StaffManualPurchase from "@/pages/StaffManualPurchase";
+import StaffRecords from "@/pages/StaffRecords";
+import PersonalCenter from "@/pages/PersonalCenter";
+import DistributorCenter from "@/pages/DistributorCenter";
+import AdminPackageManagement from "@/pages/AdminPackageManagement";
+import PackageDetail from "@/pages/PackageDetail";
+import ConsumptionDetails from "@/pages/ConsumptionDetails";
+import PurchaseHistory from "@/pages/PurchaseHistory";
+import MembershipCode from "@/pages/MembershipCode";
+import AdminMemberManagement from "@/pages/AdminMemberManagement";
+import AdminCommissionManagement from "@/pages/AdminCommissionManagement";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 // 布局组件
 import MainLayout from "@/components/layout/MainLayout";
+import StaffLayout from "@/components/layout/StaffLayout";
 
 // 保护路由组件
 // 错误边界组件 - 防止单个页面崩溃导致整个应用崩溃
@@ -88,6 +104,21 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <ErrorBoundary>{children}</ErrorBoundary>;
 };
 
+// Staff保护路由
+const StaffProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, user } = React.useContext(AuthContext);
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/staff-login" replace />;
+  }
+  
+  if (user?.role !== 'staff' && user?.role !== 'admin') {
+    return <Navigate to="/staff-login" replace />;
+  }
+  
+  return <ErrorBoundary>{children}</ErrorBoundary>;
+};
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -147,6 +178,14 @@ export default function App() {
     return user?.role === 'admin';
   }, [user]);
 
+  const isStaffUser = useCallback(() => {
+    return user?.role === 'staff';
+  }, [user]);
+
+  const isRegularUser = useCallback(() => {
+    return user?.role === 'user';
+  }, [user]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -166,7 +205,9 @@ export default function App() {
         user, 
         permissions, 
         hasPermission, 
-        isAdmin: isAdminUser, 
+        isAdmin: isAdminUser,
+        isStaff: isStaffUser,
+        isUser: isRegularUser,
         login, 
         logout 
       }}
@@ -184,12 +225,23 @@ export default function App() {
       <div id="app-root" role="application" aria-label="汗蒸养生馆管理系统">
         <Routes>
           {/* 公开路由 */}
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+          <Route path="/login" element={isAuthenticated && user?.role === 'user' ? <Navigate to="/dashboard" replace /> : <Login />} />
+          <Route path="/staff-login" element={isAuthenticated && (user?.role === 'staff' || user?.role === 'admin') ? <Navigate to="/staff/dashboard" replace /> : <StaffLogin />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-          {/* 主布局路由 - 需要认证 */}
+          {/* 用户端主布局路由 - 需要认证 */}
           <Route path="/" element={<MainLayout />}>
             <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="personal" element={<ProtectedRoute><PersonalCenter /></ProtectedRoute>} />
+            <Route path="distributor" element={<ProtectedRoute><DistributorCenter /></ProtectedRoute>} />
+            <Route path="admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            <Route path="admin/packages" element={<ProtectedRoute><AdminPackageManagement /></ProtectedRoute>} />
+            <Route path="admin/members" element={<ProtectedRoute><AdminMemberManagement /></ProtectedRoute>} />
+            <Route path="admin/commissions" element={<ProtectedRoute><AdminCommissionManagement /></ProtectedRoute>} />
+            <Route path="package/:packageId" element={<ProtectedRoute><PackageDetail /></ProtectedRoute>} />
+            <Route path="consumption-details" element={<ProtectedRoute><ConsumptionDetails /></ProtectedRoute>} />
+            <Route path="purchase-history" element={<ProtectedRoute><PurchaseHistory /></ProtectedRoute>} />
+            <Route path="membership-code" element={<ProtectedRoute><MembershipCode /></ProtectedRoute>} />
             <Route path="consumptions" element={<ProtectedRoute><ConsumptionLogs /></ProtectedRoute>} />
             <Route path="recharges" element={<ProtectedRoute><Recharges /></ProtectedRoute>} />
             <Route path="member-cards" element={<ProtectedRoute><MemberCards /></ProtectedRoute>} />
@@ -197,6 +249,14 @@ export default function App() {
             <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
            {/* 确保每次路由切换时正确卸载组件 */}
+          </Route>
+
+          {/* 员工端布局路由 */}
+          <Route path="/staff" element={<StaffLayout />}>
+            <Route path="dashboard" element={<StaffProtectedRoute><StaffDashboard /></StaffProtectedRoute>} />
+            <Route path="member-query" element={<StaffProtectedRoute><StaffMemberQuery /></StaffProtectedRoute>} />
+            <Route path="manual-purchase" element={<StaffProtectedRoute><StaffManualPurchase /></StaffProtectedRoute>} />
+            <Route path="records" element={<StaffProtectedRoute><StaffRecords /></StaffProtectedRoute>} />
           </Route>
 
           {/* 404 路由 */}

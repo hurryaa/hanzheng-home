@@ -3,9 +3,12 @@ import { createContext } from "react";
 export interface AuthUser {
   id: string;
   username: string;
-  role: string;
+  role: 'user' | 'staff' | 'admin';
   name: string;
-  email: string;
+  email?: string;
+  storeId?: string; // 员工所属门店
+  phone?: string;
+  profileImageUrl?: string;
 }
 
 export interface AuthContextValue {
@@ -15,6 +18,8 @@ export interface AuthContextValue {
   permissions: string[];
   hasPermission: (permission: string) => boolean;
   isAdmin: () => boolean;
+  isStaff: () => boolean;
+  isUser: () => boolean;
   login: (params: { token: string; user: AuthUser }) => void;
   logout: () => void;
 }
@@ -26,6 +31,8 @@ export const AuthContext = createContext<AuthContextValue>({
   permissions: [],
   hasPermission: () => false,
   isAdmin: () => false,
+  isStaff: () => false,
+  isUser: () => false,
   login: () => {},
   logout: () => {},
 });

@@ -19,7 +19,20 @@ type CollectionName =
   | 'rolePermissions'
   | 'staffMembers'
   | 'teamGroups'
-  | 'branchSettings';
+  | 'branchSettings'
+  | 'stores'
+  | 'staff'
+  | 'packageConfigs'
+  | 'packageStoreMaps'
+  | 'userPackages'
+  | 'userPackageStoreMaps'
+  | 'purchaseRecords'
+  | 'redemptionRecords'
+  | 'sessionAdjustments'
+  | 'distributorProfiles'
+  | 'inviteBindings'
+  | 'commissionRecords'
+  | 'auditLogs';
 
 type CollectionCache = Partial<Record<CollectionName, unknown>>;
 
@@ -34,7 +47,20 @@ const KNOWN_COLLECTIONS: CollectionName[] = [
   'rolePermissions',
   'staffMembers',
   'teamGroups',
-  'branchSettings'
+  'branchSettings',
+  'stores',
+  'staff',
+  'packageConfigs',
+  'packageStoreMaps',
+  'userPackages',
+  'userPackageStoreMaps',
+  'purchaseRecords',
+  'redemptionRecords',
+  'sessionAdjustments',
+  'distributorProfiles',
+  'inviteBindings',
+  'commissionRecords',
+  'auditLogs'
 ];
 
 const persistQueue = new Map<CollectionName, Promise<void>>();

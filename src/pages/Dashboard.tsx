@@ -9,14 +9,6 @@ import {
 import { Member, cn, getRechargeRecords, getCardTypes, getMembers, getConsumptionRecords, initStorageData, initRechargeData, initCardTypes } from '@/lib/utils';
 import { AuthContext } from '@/contexts/authContext';
 import { canExportData } from '@/lib/permissions';
-import {
-  formatMembersForExport,
-  formatRechargesForExport,
-  formatConsumptionsForExport,
-  formatCardTypesForExport,
-  exportMultipleSheets,
-  generateFilename
-} from '@/lib/exportUtils';
 
 // 状态标签样式
 const StatusBadge = ({ status }: { status: string }) => {
