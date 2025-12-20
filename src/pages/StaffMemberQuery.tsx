@@ -1,12 +1,12 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { toast } from 'sonner';
-import { searchMembers } from '@/lib/utils';
+import apiClient from '@/lib/apiClient';
 import { 
   queryMemberForStaff, 
   executeRedemption,
   getUserRedemptionRecords 
-} from '@/lib/sessionManagement';
+} from '@/lib/sessionManagementAdapter';
 import { MemberQueryResult, RedemptionRecord } from '@/lib/types';
 
 export default function StaffMemberQuery() {
@@ -19,31 +19,42 @@ export default function StaffMemberQuery() {
   const [redemptionRemark, setRedemptionRemark] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchInput.trim()) {
       toast.error('请输入会员信息');
       return;
     }
 
-    // 搜索会员
-    const members = searchMembers(searchInput);
-    if (members.length === 0) {
-      toast.error('未找到会员信息');
-      setSelectedMember(null);
-      return;
-    }
+    setLoading(true);
+    try {
+      // 通过API搜索会员
+      const response = await apiClient.searchMembers(searchInput);
+      const members = response.data || [];
+      
+      if (members.length === 0) {
+        toast.error('未找到会员信息');
+        setSelectedMember(null);
+        setLoading(false);
+        return;
+      }
 
-    // 查询会员详情（暂时使用第一个结果）
-    const memberData = queryMemberForStaff(members[0].id);
-    if (memberData) {
-      setSelectedMember(memberData);
-      const records = getUserRedemptionRecords(members[0].id, 10);
-      setRecentRecords(records);
-      toast.success(`已查询到会员：${memberData.user.name}`);
-    } else {
-      toast.error('无法查询会员信息');
-      setSelectedMember(null);
+      // 查询会员详情
+      const memberData = await queryMemberForStaff(members[0].id);
+      if (memberData) {
+        setSelectedMember(memberData);
+        const records = await getUserRedemptionRecords(members[0].id, 10);
+        setRecentRecords(records);
+        toast.success(`已查询到会员：${memberData.user.name}`);
+      } else {
+        toast.error('无法查询会员信息');
+        setSelectedMember(null);
+      }
+    } catch (error) {
+      toast.error('搜索会员失败');
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,10 +71,7 @@ export default function StaffMemberQuery() {
 
     setLoading(true);
     try {
-      // 延迟模拟网络请求
-      await new Promise(resolve => setTimeout(resolve, 600));
-
-      const result = executeRedemption(
+      const result = await executeRedemption(
         selectedMember.user.id,
         user.storeId,
         user.id,
@@ -75,10 +83,10 @@ export default function StaffMemberQuery() {
         toast.success(`✓ 核销成功！已扣 ${sessionsToDeduct} 次`);
         
         // 刷新会员信息
-        const updatedMember = queryMemberForStaff(selectedMember.user.id);
+        const updatedMember = await queryMemberForStaff(selectedMember.user.id);
         if (updatedMember) {
           setSelectedMember(updatedMember);
-          const records = getUserRedemptionRecords(selectedMember.user.id, 10);
+          const records = await getUserRedemptionRecords(selectedMember.user.id, 10);
           setRecentRecords(records);
         }
 

@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '@/contexts/authContext';
 import { toast } from 'sonner';
+import apiClient from '@/lib/apiClient';
 
 export default function StaffLogin() {
   const [username, setUsername] = useState('');
@@ -25,29 +26,44 @@ export default function StaffLogin() {
     e.preventDefault();
     setLoading(true);
 
-    // 模拟登录延迟
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    if (username === DEMO_STAFF.username && password === DEMO_STAFF.password) {
-      // 模拟成功登录
-      const staffUser = {
-        id: DEMO_STAFF.id,
-        username: DEMO_STAFF.username,
-        role: 'staff' as const,
-        name: DEMO_STAFF.name,
-        storeId: DEMO_STAFF.storeId,
-        email: DEMO_STAFF.email,
-      };
-
+    try {
+      // 尝试通过API登录
+      const response = await apiClient.staffLogin(username, password);
+      
       login({
-        token: `staff_token_${Date.now()}`,
-        user: staffUser,
+        token: response.token,
+        user: response.user,
       });
 
       toast.success('员工登录成功');
       navigate('/staff/dashboard');
-    } else {
-      toast.error('用户名或密码错误');
+    } catch (error) {
+      // API失败时降级到演示账号
+      console.warn('API登录失败，尝试演示账号...');
+      
+      if (username === DEMO_STAFF.username && password === DEMO_STAFF.password) {
+        // 模拟成功登录
+        const staffUser = {
+          id: DEMO_STAFF.id,
+          username: DEMO_STAFF.username,
+          role: 'staff' as const,
+          name: DEMO_STAFF.name,
+          storeId: DEMO_STAFF.storeId,
+          email: DEMO_STAFF.email,
+        };
+
+        login({
+          token: `staff_token_${Date.now()}`,
+          user: staffUser,
+        });
+
+        toast.success('员工登录成功（演示账号）');
+        navigate('/staff/dashboard');
+      } else {
+        toast.error('用户名或密码错误');
+        setLoading(false);
+      }
+    } finally {
       setLoading(false);
     }
   };

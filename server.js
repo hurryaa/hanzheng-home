@@ -197,7 +197,13 @@ async function initDatabase() {
   const collections = [
     'members', 'recharges', 'consumptions', 'cardTypes',
     'systemSettings', 'accounts', 'operationLogs', 'rolePermissions',
-    'staffMembers', 'teamGroups', 'branchSettings'
+    'staffMembers', 'teamGroups', 'branchSettings',
+    // 汗蒸系统新增
+    'stores', 'packageConfigs', 'packageStoreMaps',
+    'userPackages', 'userPackageStoreMaps',
+    'purchaseRecords', 'redemptionRecords', 'sessionAdjustments',
+    'distributorProfiles', 'inviteBindings', 'commissionRecords',
+    'auditLogs'
   ];
   
   for (const name of collections) {
@@ -407,6 +413,411 @@ app.post('/api/auth/login', async (req, res) => {
         email: account.email
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：员工登录 ==========
+app.post('/api/auth/staff-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: '用户名和密码不能为空' });
+    }
+    
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['staffMembers']);
+    const staffMembers = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const staff = staffMembers.find((s) => s.username === username);
+    if (!staff) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+    
+    const isPasswordValid = await bcrypt.compare(password, staff.password_hash || staff.passwordHash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+    
+    if (staff.status !== 'active') {
+      return res.status(403).json({ error: '账户已被禁用' });
+    }
+    
+    const token = jwt.sign(
+      { id: staff.id, username: staff.username, role: 'staff', storeId: staff.storeId },
+      config.jwtSecret,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({
+      token,
+      user: {
+        id: staff.id,
+        username: staff.username,
+        role: 'staff',
+        name: staff.name,
+        storeId: staff.storeId
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：会员管理 API ==========
+app.get('/api/members', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['members']);
+    const members = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    res.json({ data: members });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/members/:id', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['members']);
+    const members = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    const member = members.find((m) => m.id === req.params.id);
+    
+    if (!member) {
+      return res.status(404).json({ error: '会员不存在' });
+    }
+    
+    res.json({ data: member });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/members', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['members']);
+    const members = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const newMember = {
+      id: `USER${Date.now()}`,
+      ...req.body,
+      createdAt: new Date().toISOString()
+    };
+    
+    members.unshift(newMember);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(members), 'members']);
+    
+    res.json({ data: newMember });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/members/search', async (req, res) => {
+  try {
+    const keyword = req.query.keyword || '';
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['members']);
+    const members = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const filtered = members.filter((m) =>
+      m.name.includes(keyword) || m.phone.includes(keyword)
+    );
+    
+    res.json({ data: filtered });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：套餐配置 API ==========
+app.get('/api/packages', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['packageConfigs']);
+    const packages = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    res.json({ data: packages });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/packages', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['packageConfigs']);
+    const packages = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const newPackage = {
+      id: `PKG${Date.now()}`,
+      ...req.body,
+      createdAt: new Date().toISOString()
+    };
+    
+    packages.push(newPackage);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(packages), 'packageConfigs']);
+    
+    res.json({ data: newPackage });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/packages/:id', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['packageConfigs']);
+    const packages = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const index = packages.findIndex((p) => p.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: '套餐不存在' });
+    }
+    
+    packages[index] = { ...packages[index], ...req.body };
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(packages), 'packageConfigs']);
+    
+    res.json({ data: packages[index] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/packages/:id', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['packageConfigs']);
+    const packages = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const filtered = packages.filter((p) => p.id !== req.params.id);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(filtered), 'packageConfigs']);
+    
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：用户次卡 API ==========
+app.get('/api/users/:userId/packages', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['userPackages']);
+    const packages = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const userPackages = packages.filter((p) => p.userId === req.params.userId);
+    res.json({ data: userPackages });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/users/:userId/package-balance', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['userPackages']);
+    const packages = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const userPackages = packages.filter((p) => p.userId === req.params.userId);
+    const now = new Date();
+    
+    let availableSessions = 0;
+    let expiringSessions = 0;
+    let expiredSessions = 0;
+    let totalSessions = 0;
+    
+    userPackages.forEach((pkg) => {
+      const expiresAt = new Date(pkg.expiresAt);
+      const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      if (pkg.status === 'active' && expiresAt > now) {
+        availableSessions += pkg.remainingSessions;
+        totalSessions += pkg.totalSessions;
+        if (expiresAt <= sevenDaysLater) {
+          expiringSessions += pkg.remainingSessions;
+        }
+      } else if (pkg.status === 'active' && expiresAt <= now) {
+        expiredSessions += pkg.remainingSessions;
+        totalSessions += pkg.totalSessions;
+      } else {
+        totalSessions += pkg.totalSessions;
+      }
+    });
+    
+    res.json({
+      data: {
+        availableSessions,
+        expiringSessions,
+        expiredSessions,
+        redeemedSessions: 0,
+        totalSessions
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：购买记录 API ==========
+app.post('/api/purchase-records', async (req, res) => {
+  try {
+    const db = await getPool();
+    
+    // 创建购买记录
+    const [purchaseRows] = await db.query('SELECT data FROM collections WHERE name = ?', ['purchaseRecords']);
+    const purchases = purchaseRows.length > 0 ? JSON.parse(purchaseRows[0].data) : [];
+    
+    const newPurchase = {
+      id: `PR${Date.now()}`,
+      ...req.body,
+      createdAt: new Date().toISOString()
+    };
+    
+    purchases.unshift(newPurchase);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(purchases), 'purchaseRecords']);
+    
+    // 创建用户次卡
+    const [packageRows] = await db.query('SELECT data FROM collections WHERE name = ?', ['userPackages']);
+    const userPackages = packageRows.length > 0 ? JSON.parse(packageRows[0].data) : [];
+    
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + (req.body.validDays || 180));
+    
+    const userPackage = {
+      id: `UP${Date.now()}`,
+      userId: req.body.userId,
+      packageId: req.body.packageId,
+      totalSessions: req.body.sessionsAdded,
+      remainingSessions: req.body.sessionsAdded,
+      priceAmount: req.body.amount,
+      purchasedAt: new Date().toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      applicableStoreScope: 'all',
+      status: 'active'
+    };
+    
+    userPackages.unshift(userPackage);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(userPackages), 'userPackages']);
+    
+    res.json({ data: newPurchase });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：核销记录 API ==========
+app.post('/api/redemption-records', async (req, res) => {
+  try {
+    const db = await getPool();
+    
+    // 创建核销记录
+    const [redemptionRows] = await db.query('SELECT data FROM collections WHERE name = ?', ['redemptionRecords']);
+    const redemptions = redemptionRows.length > 0 ? JSON.parse(redemptionRows[0].data) : [];
+    
+    const newRedemption = {
+      id: `RD${Date.now()}`,
+      ...req.body,
+      createdAt: new Date().toISOString()
+    };
+    
+    redemptions.unshift(newRedemption);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(redemptions), 'redemptionRecords']);
+    
+    // 更新用户次卡的剩余次数
+    const [packageRows] = await db.query('SELECT data FROM collections WHERE name = ?', ['userPackages']);
+    const userPackages = packageRows.length > 0 ? JSON.parse(packageRows[0].data) : [];
+    
+    const pkgIndex = userPackages.findIndex((p) => p.id === req.body.userPackageId);
+    if (pkgIndex !== -1) {
+      userPackages[pkgIndex].remainingSessions -= req.body.sessionsDeducted;
+      await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(userPackages), 'userPackages']);
+    }
+    
+    res.json({ data: newRedemption });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/redemption-records/:id/void', async (req, res) => {
+  try {
+    const db = await getPool();
+    
+    // 更新核销记录状态
+    const [redemptionRows] = await db.query('SELECT data FROM collections WHERE name = ?', ['redemptionRecords']);
+    const redemptions = redemptionRows.length > 0 ? JSON.parse(redemptionRows[0].data) : [];
+    
+    const record = redemptions.find((r) => r.id === req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: '核销记录不存在' });
+    }
+    
+    record.status = 'void';
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(redemptions), 'redemptionRecords']);
+    
+    // 回滚用户次卡的剩余次数
+    const [packageRows] = await db.query('SELECT data FROM collections WHERE name = ?', ['userPackages']);
+    const userPackages = packageRows.length > 0 ? JSON.parse(packageRows[0].data) : [];
+    
+    const pkgIndex = userPackages.findIndex((p) => p.id === record.userPackageId);
+    if (pkgIndex !== -1) {
+      userPackages[pkgIndex].remainingSessions += record.sessionsDeducted;
+      await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(userPackages), 'userPackages']);
+    }
+    
+    res.json({ data: record });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/redemption-records', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['redemptionRecords']);
+    const records = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    res.json({ data: records });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== 新增：其他API占位符 ==========
+// 这些API可以在后续迭代中补充实现
+app.get('/api/distributors/:userId', async (req, res) => {
+  res.json({ data: null });
+});
+
+app.get('/api/audit-logs', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['auditLogs']);
+    const logs = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    res.json({ data: logs });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/audit-logs', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [rows] = await db.query('SELECT data FROM collections WHERE name = ?', ['auditLogs']);
+    const logs = rows.length > 0 ? JSON.parse(rows[0].data) : [];
+    
+    const newLog = {
+      id: `AL${Date.now()}`,
+      ...req.body,
+      createdAt: new Date().toISOString()
+    };
+    
+    logs.unshift(newLog);
+    await db.query('UPDATE collections SET data = ? WHERE name = ?', [JSON.stringify(logs), 'auditLogs']);
+    
+    res.json({ data: newLog });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
