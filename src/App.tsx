@@ -17,7 +17,11 @@ import Settings from "@/pages/Settings";
 import StaffLogin from "@/pages/StaffLogin";
 import StaffDashboard from "@/pages/StaffDashboard";
 import StaffMemberQuery from "@/pages/StaffMemberQuery";
+import StaffManualPurchase from "@/pages/StaffManualPurchase";
+import StaffRecords from "@/pages/StaffRecords";
 import PersonalCenter from "@/pages/PersonalCenter";
+import DistributorCenter from "@/pages/DistributorCenter";
+import AdminPackageManagement from "@/pages/AdminPackageManagement";
 
 // 布局组件
 import MainLayout from "@/components/layout/MainLayout";
@@ -222,6 +226,8 @@ export default function App() {
           <Route path="/" element={<MainLayout />}>
             <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="personal" element={<ProtectedRoute><PersonalCenter /></ProtectedRoute>} />
+            <Route path="distributor" element={<ProtectedRoute><DistributorCenter /></ProtectedRoute>} />
+            <Route path="admin/packages" element={<ProtectedRoute><AdminPackageManagement /></ProtectedRoute>} />
             <Route path="consumptions" element={<ProtectedRoute><ConsumptionLogs /></ProtectedRoute>} />
             <Route path="recharges" element={<ProtectedRoute><Recharges /></ProtectedRoute>} />
             <Route path="member-cards" element={<ProtectedRoute><MemberCards /></ProtectedRoute>} />
@@ -235,6 +241,8 @@ export default function App() {
           <Route path="/staff" element={<StaffLayout />}>
             <Route path="dashboard" element={<StaffProtectedRoute><StaffDashboard /></StaffProtectedRoute>} />
             <Route path="member-query" element={<StaffProtectedRoute><StaffMemberQuery /></StaffProtectedRoute>} />
+            <Route path="manual-purchase" element={<StaffProtectedRoute><StaffManualPurchase /></StaffProtectedRoute>} />
+            <Route path="records" element={<StaffProtectedRoute><StaffRecords /></StaffProtectedRoute>} />
           </Route>
 
           {/* 404 路由 */}
