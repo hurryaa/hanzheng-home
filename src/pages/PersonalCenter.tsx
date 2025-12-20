@@ -2,12 +2,14 @@ import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { useNavigate } from 'react-router-dom';
 import { getMemberById } from '@/lib/utils';
+import apiClient from '@/lib/apiClient';
 import { 
-  calculateSessionBalance, 
+  getSessionBalance, 
   getUserActivePackages,
   getUserPurchaseRecords,
   getUserRedemptionRecords
-} from '@/lib/sessionManagement';
+} from '@/lib/sessionManagementAdapter';
+import { toast } from 'sonner';
 import { SessionBalance, UserPackage, PurchaseRecord, RedemptionRecord } from '@/lib/types';
 
 export default function PersonalCenter() {
@@ -20,22 +22,31 @@ export default function PersonalCenter() {
 
   useEffect(() => {
     if (user?.id) {
+      loadData();
+    }
+  }, [user]);
+
+  const loadData = async () => {
+    try {
       // 获取会话余额
-      const balance = calculateSessionBalance(user.id);
+      const balance = await getSessionBalance(user?.id || '');
       setSessionBalance(balance);
 
       // 获取活跃次卡
-      const packages = getUserActivePackages(user.id);
+      const packages = await getUserActivePackages(user?.id || '');
       setActivePackages(packages);
 
       // 获取购买和核销记录
-      const purchases = getUserPurchaseRecords(user.id, 5);
+      const purchases = await getUserPurchaseRecords(user?.id || '', 5);
       setPurchaseRecords(purchases);
 
-      const redemptions = getUserRedemptionRecords(user.id, 5);
+      const redemptions = await getUserRedemptionRecords(user?.id || '', 5);
       setRedemptionRecords(redemptions);
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      toast.error('加载数据失败');
     }
-  }, [user]);
+  };
 
   if (!sessionBalance || !user) {
     return <div>加载中...</div>;
@@ -103,11 +114,12 @@ export default function PersonalCenter() {
         {activePackages.length > 0 ? (
           <div className="space-y-3">
             {activePackages.map((pkg) => (
-              <div
+              <button
                 key={pkg.id}
-                className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200"
+                onClick={() => navigate(`/package/${pkg.id}`)}
+                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover:shadow-lg hover:border-blue-400 transition cursor-pointer"
               >
-                <div className="flex-1">
+                <div className="flex-1 text-left">
                   <p className="font-semibold text-gray-900">
                     {pkg.totalSessions} 次卡
                   </p>
@@ -116,13 +128,16 @@ export default function PersonalCenter() {
                     | 有效期至：{new Date(pkg.expiresAt).toLocaleDateString('zh-CN')}
                   </p>
                 </div>
-                <div className="text-right ml-4">
-                  <p className="text-3xl font-bold text-blue-600">
-                    {pkg.remainingSessions}
-                  </p>
-                  <p className="text-xs text-gray-600">剩余次数</p>
+                <div className="text-right ml-4 flex items-center gap-4">
+                  <div>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {pkg.remainingSessions}
+                    </p>
+                    <p className="text-xs text-gray-600">剩余次数</p>
+                  </div>
+                  <i className="fa-solid fa-chevron-right text-gray-400"></i>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         ) : (
@@ -142,7 +157,15 @@ export default function PersonalCenter() {
       <div className="grid grid-cols-2 gap-6 mb-8">
         {/* 购买记录 */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">最近购买</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900">最近购买</h2>
+            <button
+              onClick={() => navigate('/purchase-history')}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
+            >
+              查看全部 →
+            </button>
+          </div>
           {purchaseRecords.length > 0 ? (
             <div className="space-y-2">
               {purchaseRecords.map((record) => (
@@ -169,7 +192,15 @@ export default function PersonalCenter() {
 
         {/* 核销记录 */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">最近核销</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900">最近核销</h2>
+            <button
+              onClick={() => navigate('/consumption-details')}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
+            >
+              查看全部 →
+            </button>
+          </div>
           {redemptionRecords.length > 0 ? (
             <div className="space-y-2">
               {redemptionRecords.map((record) => (
@@ -193,7 +224,7 @@ export default function PersonalCenter() {
       </div>
 
       {/* 功能导航 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <button
           onClick={() => navigate('/recharges')}
           className="bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-lg p-6 text-center transition"
@@ -204,12 +235,21 @@ export default function PersonalCenter() {
         </button>
 
         <button
-          onClick={() => navigate('/consumptions')}
+          onClick={() => navigate('/consumption-details')}
           className="bg-green-50 hover:bg-green-100 border-2 border-green-200 rounded-lg p-6 text-center transition"
         >
           <i className="fa-solid fa-fire text-3xl text-green-600 mb-3 block"></i>
           <h3 className="font-semibold text-gray-900">消费记录</h3>
           <p className="text-sm text-gray-600 mt-1">查看汗蒸核销记录</p>
+        </button>
+
+        <button
+          onClick={() => navigate('/membership-code')}
+          className="bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 rounded-lg p-6 text-center transition"
+        >
+          <i className="fa-solid fa-qrcode text-3xl text-purple-600 mb-3 block"></i>
+          <h3 className="font-semibold text-gray-900">会员码</h3>
+          <p className="text-sm text-gray-600 mt-1">展示二维码进行核销</p>
         </button>
 
         <button

@@ -22,6 +22,10 @@ import StaffRecords from "@/pages/StaffRecords";
 import PersonalCenter from "@/pages/PersonalCenter";
 import DistributorCenter from "@/pages/DistributorCenter";
 import AdminPackageManagement from "@/pages/AdminPackageManagement";
+import PackageDetail from "@/pages/PackageDetail";
+import ConsumptionDetails from "@/pages/ConsumptionDetails";
+import PurchaseHistory from "@/pages/PurchaseHistory";
+import MembershipCode from "@/pages/MembershipCode";
 
 // 布局组件
 import MainLayout from "@/components/layout/MainLayout";
@@ -228,6 +232,10 @@ export default function App() {
             <Route path="personal" element={<ProtectedRoute><PersonalCenter /></ProtectedRoute>} />
             <Route path="distributor" element={<ProtectedRoute><DistributorCenter /></ProtectedRoute>} />
             <Route path="admin/packages" element={<ProtectedRoute><AdminPackageManagement /></ProtectedRoute>} />
+            <Route path="package/:packageId" element={<ProtectedRoute><PackageDetail /></ProtectedRoute>} />
+            <Route path="consumption-details" element={<ProtectedRoute><ConsumptionDetails /></ProtectedRoute>} />
+            <Route path="purchase-history" element={<ProtectedRoute><PurchaseHistory /></ProtectedRoute>} />
+            <Route path="membership-code" element={<ProtectedRoute><MembershipCode /></ProtectedRoute>} />
             <Route path="consumptions" element={<ProtectedRoute><ConsumptionLogs /></ProtectedRoute>} />
             <Route path="recharges" element={<ProtectedRoute><Recharges /></ProtectedRoute>} />
             <Route path="member-cards" element={<ProtectedRoute><MemberCards /></ProtectedRoute>} />
